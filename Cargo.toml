@@ -1,0 +1,31 @@
+[package]
+name = "taim"
+version = "0.0.1-dev"
+description = "An AI Agent orchestrator using Claude Code"
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+authors = ["Romain Marcadier <romain.muller@telecomnancy.net>"]
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
+
+# Error handling
+thiserror = { version = "2.0" }
+
+# Utilities
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Testing
+proptest = { version = "1.5" }

@@ -1,0 +1,15 @@
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.Dev.package."*"]
+debug = false
+
+[profile.debug-full]
+inherits = "dev"
+debug = true
+
+[profile.release]
+codegen-units = 1
+incremental = false
+lto = "fat"
+opt-level = "s"
