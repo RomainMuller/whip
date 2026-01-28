@@ -70,7 +70,6 @@ impl Message {
         )
     }
 
-
     /// Returns `true` if this message should terminate the application.
     ///
     /// # Examples

@@ -17,8 +17,8 @@ fn test_task(title: &str, description: &str) -> Task {
 }
 
 use super::{
-    render_board, render_detail_panel, render_help_overlay, render_lane, render_status_bar,
-    render_task_card, LanePosition,
+    LanePosition, render_board, render_detail_panel, render_help_overlay, render_lane,
+    render_status_bar, render_task_card,
 };
 
 /// Converts a buffer to a string representation for snapshot testing.
@@ -116,7 +116,15 @@ fn snapshot_lane_empty() {
     let area = Rect::new(0, 0, 25, 15);
     let mut buf = Buffer::empty(area);
 
-    render_lane(&lane, false, None, area, &mut buf, LanePosition::First, false);
+    render_lane(
+        &lane,
+        false,
+        None,
+        area,
+        &mut buf,
+        LanePosition::First,
+        false,
+    );
 
     insta::assert_snapshot!(buffer_to_string(&buf));
 }
@@ -136,7 +144,15 @@ fn snapshot_lane_with_tasks() {
     let area = Rect::new(0, 0, 25, 15);
     let mut buf = Buffer::empty(area);
 
-    render_lane(&lane, true, Some(0), area, &mut buf, LanePosition::Middle, false);
+    render_lane(
+        &lane,
+        true,
+        Some(0),
+        area,
+        &mut buf,
+        LanePosition::Middle,
+        false,
+    );
 
     insta::assert_snapshot!(buffer_to_string(&buf));
 }

@@ -9,7 +9,7 @@ use ratatui::{
 };
 use taim_protocol::{KanbanBoard, LaneKind};
 
-use super::lane::{render_lane, LanePosition};
+use super::lane::{LanePosition, render_lane};
 
 /// Renders the complete Kanban board to the buffer.
 ///
@@ -92,7 +92,15 @@ pub fn render_board(
         // Check if the previous lane is focused (for shared border coloring)
         let prev_focused = i > 0 && selected_lane == i - 1;
 
-        render_lane(lane, is_focused, task_selection, lane_areas[i], buf, position, prev_focused);
+        render_lane(
+            lane,
+            is_focused,
+            task_selection,
+            lane_areas[i],
+            buf,
+            position,
+            prev_focused,
+        );
     }
 }
 
