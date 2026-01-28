@@ -2,23 +2,23 @@
 source: crates/taim-tui/src/widgets/tests.rs
 expression: buffer_to_string(&buf)
 ---
-┌ Task Details ────────────────────────┐
-│Title: Idle Task                      │
-│Status: ○ Idle                        │
-│Lane: Backlog                         │
-│                                      │
-│────────────────────────────────────  │
-│                                      │
-│Description:                          │
-│This task is waiting to be started.   │
-│It has a longer description to test   │
-│text wrapping in the detail panel.    │
-│                                      │
-│────────────────────────────────────  │
-│                                      │
+╭ Idle Task ───────────────────────────╮
+│○ Idle  │  Lane: Backlog              │
 │Created: 2025-01-15 10:30             │
 │Updated: 2025-01-15 10:30             │
+│──────────────────────────────────────│
+│This task is waiting to be started. It│
+│has a longer description to test text │
+│wrapping in the detail panel.         │
 │                                      │
-│[Esc] Close                           │
 │                                      │
-└──────────────────────────────────────┘
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│──────────────────────────────────────│
+│[Esc] Back to board  [↑↓] Scroll      │
+╰──────────────────────────────────────╯

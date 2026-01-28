@@ -1,20 +1,19 @@
 ---
 source: crates/taim-tui/src/widgets/tests.rs
-assertion_line: 127
 expression: buffer_to_string(&buf)
 ---
-┌In Progress (2)────────┐
-│┌─────────────────────┐│
-││Active task          ││
-││Currently being wo...││
-│└─────────────────────┘│
-│┌─────────────────────┐│
-││Waiting task         ││
-││In queue             ││
-│└─────────────────────┘│
-│                       │
-│                       │
-│                       │
-│                       │
-│                       │
-└───────────────────────┘
+┬In Progress (2)─────────
+│┌──────────────────────┐
+││Active task           │
+││Currently being wor...│
+│└──────────────────────┘
+│┌──────────────────────┐
+││Waiting task          │
+││In queue              │
+│└──────────────────────┘
+│
+│
+│
+│
+│
+┴────────────────────────

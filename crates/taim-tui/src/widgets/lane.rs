@@ -7,10 +7,61 @@ use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
+    symbols::border,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Widget},
 };
 use taim_protocol::Lane;
+
+/// Position of a lane in the horizontal layout.
+///
+/// Used to determine which borders to render for each lane, enabling
+/// collapsed borders between adjacent lanes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LanePosition {
+    /// First (leftmost) lane - has left border with rounded corners.
+    First,
+    /// Middle lanes - has left border with T-connectors (no rounded corners on left).
+    Middle,
+    /// Last (rightmost) lane - has both borders, rounded on right, T-connectors on left.
+    Last,
+}
+
+/// Border set for the first (leftmost) lane: rounded corners on left, no right border.
+const BORDER_SET_FIRST: border::Set = border::Set {
+    top_left: "╭",
+    top_right: "─",     // No corner, just continues the line
+    bottom_left: "╰",
+    bottom_right: "─",  // No corner, just continues the line
+    vertical_left: "│",
+    vertical_right: " ", // No right border
+    horizontal_top: "─",
+    horizontal_bottom: "─",
+};
+
+/// Border set for middle lanes: T-connectors on left, no right border.
+const BORDER_SET_MIDDLE: border::Set = border::Set {
+    top_left: "┬",      // T-connector joining from previous lane
+    top_right: "─",     // No corner, just continues the line
+    bottom_left: "┴",   // T-connector joining from previous lane
+    bottom_right: "─",  // No corner, just continues the line
+    vertical_left: "│",
+    vertical_right: " ", // No right border
+    horizontal_top: "─",
+    horizontal_bottom: "─",
+};
+
+/// Border set for the last (rightmost) lane: T-connectors on left, rounded on right.
+const BORDER_SET_LAST: border::Set = border::Set {
+    top_left: "┬",      // T-connector joining from previous lane
+    top_right: "╮",     // Rounded corner on outer edge
+    bottom_left: "┴",   // T-connector joining from previous lane
+    bottom_right: "╯",  // Rounded corner on outer edge
+    vertical_left: "│",
+    vertical_right: "│",
+    horizontal_top: "─",
+    horizontal_bottom: "─",
+};
 
 use super::task_card::render_task_card;
 
@@ -29,6 +80,8 @@ const TASK_CARD_HEIGHT: u16 = 4;
 /// * `selected_idx` - Index of the selected task within this lane, if any
 /// * `area` - The rectangular area to render into
 /// * `buf` - The buffer to render into
+/// * `position` - The lane's position in the horizontal layout, used to determine borders
+/// * `prev_focused` - Whether the previous (left) lane is focused, for coloring shared borders
 ///
 /// # Layout
 ///
@@ -53,7 +106,7 @@ const TASK_CARD_HEIGHT: u16 = 4;
 /// use ratatui::buffer::Buffer;
 /// use ratatui::layout::Rect;
 /// use taim_protocol::{Lane, LaneKind, Task};
-/// use taim_tui::widgets::render_lane;
+/// use taim_tui::widgets::{render_lane, LanePosition};
 ///
 /// let mut lane = Lane::new(LaneKind::Backlog);
 /// lane.add_task(Task::new("Task 1", "Description"));
@@ -61,7 +114,7 @@ const TASK_CARD_HEIGHT: u16 = 4;
 /// let area = Rect::new(0, 0, 20, 15);
 /// let mut buf = Buffer::empty(area);
 ///
-/// render_lane(&lane, true, Some(0), area, &mut buf);
+/// render_lane(&lane, true, Some(0), area, &mut buf, LanePosition::First, false);
 /// ```
 pub fn render_lane(
     lane: &Lane,
@@ -69,8 +122,12 @@ pub fn render_lane(
     selected_idx: Option<usize>,
     area: Rect,
     buf: &mut Buffer,
+    position: LanePosition,
+    prev_focused: bool,
 ) {
-    // Determine border style based on focus
+    // Determine border style based on focus.
+    // For the left border (shared with previous lane), highlight if either lane is focused.
+    let left_border_highlighted = is_focused || prev_focused;
     let border_style = if is_focused {
         Style::default().fg(Color::Cyan)
     } else {
@@ -87,14 +144,45 @@ pub fn render_lane(
         Style::default().fg(Color::White)
     };
 
+    // Determine which borders to render based on lane position.
+    // This collapses borders between adjacent lanes to avoid double-borders:
+    // - First lane has LEFT border, no RIGHT (next lane provides it)
+    // - Middle lanes have LEFT border, no RIGHT (next lane provides it)
+    // - Last lane has both LEFT and RIGHT borders
+    let borders = match position {
+        LanePosition::First => Borders::TOP | Borders::BOTTOM | Borders::LEFT,
+        LanePosition::Middle => Borders::TOP | Borders::BOTTOM | Borders::LEFT,
+        LanePosition::Last => Borders::ALL,
+    };
+
+    // Select the appropriate border set based on position
+    let border_set = match position {
+        LanePosition::First => BORDER_SET_FIRST,
+        LanePosition::Middle => BORDER_SET_MIDDLE,
+        LanePosition::Last => BORDER_SET_LAST,
+    };
+
     let block = Block::default()
         .title(Span::styled(title, title_style))
-        .borders(Borders::ALL)
+        .borders(borders)
+        .border_set(border_set)
         .border_style(border_style);
 
     // Render the outer block
     let inner_area = block.inner(area);
     block.render(area, buf);
+
+    // If the left border should be highlighted (prev lane is focused) but this lane isn't,
+    // we need to recolor the left border to cyan since the block was rendered with gray.
+    if left_border_highlighted && !is_focused && area.width > 0 {
+        let highlight_style = Style::default().fg(Color::Cyan);
+        let x = area.x;
+        for y in area.y..area.y.saturating_add(area.height) {
+            if let Some(cell) = buf.cell_mut((x, y)) {
+                cell.set_style(highlight_style);
+            }
+        }
+    }
 
     // Handle empty lanes
     if lane.is_empty() {
@@ -181,7 +269,7 @@ mod tests {
         let area = Rect::new(0, 0, 20, 15);
         let mut buf = Buffer::empty(area);
 
-        render_lane(&lane, false, None, area, &mut buf);
+        render_lane(&lane, false, None, area, &mut buf, LanePosition::First, false);
 
         // Convert buffer to string and check for placeholder
         let content = buffer_to_string(&buf);
@@ -197,7 +285,7 @@ mod tests {
         let area = Rect::new(0, 0, 25, 15);
         let mut buf = Buffer::empty(area);
 
-        render_lane(&lane, true, Some(0), area, &mut buf);
+        render_lane(&lane, true, Some(0), area, &mut buf, LanePosition::Middle, false);
 
         let content = buffer_to_string(&buf);
         assert!(content.contains("In Progress"));

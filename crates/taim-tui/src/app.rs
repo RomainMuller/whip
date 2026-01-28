@@ -6,10 +6,10 @@
 use crossterm::event::Event;
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, BorderType, Borders, Paragraph},
 };
 use taim_protocol::{KanbanBoard, Message};
 
@@ -19,7 +19,7 @@ use crate::{
     AppState, Focus,
     event::{key_to_message, poll_event},
     terminal::AppTerminal,
-    widgets::{render_board, render_detail_panel, render_help_overlay, render_status_bar},
+    widgets::{render_board, render_detail_panel, render_help_overlay},
 };
 
 /// The main application struct.
@@ -149,39 +149,26 @@ impl App {
     pub fn view(&self, frame: &mut Frame) {
         let area = frame.area();
 
-        // Create main layout
+        // Create main layout (header + content, no footer)
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(3), // Header
-                Constraint::Min(0),    // Board (and detail if visible)
-                Constraint::Length(3), // Footer
+                Constraint::Min(0),    // Content area
             ])
             .split(area);
 
         // Render header
         self.render_header(frame, chunks[0]);
 
-        // Render board (and optionally detail panel)
+        // Render either board OR detail screen (mutually exclusive views)
         if self.state.detail_visible {
-            // Split horizontally: 60% board, 40% detail
-            let content_chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
-                .split(chunks[1]);
-
-            // Render board in left panel
-            self.render_board_area(frame, content_chunks[0]);
-
-            // Render detail panel in right panel
-            self.render_detail(frame, content_chunks[1]);
+            // Full-screen detail view
+            self.render_detail(frame, chunks[1]);
         } else {
             // Full board view
             self.render_board_area(frame, chunks[1]);
         }
-
-        // Render footer
-        self.render_footer(frame, chunks[2]);
 
         // Render help overlay on top if visible
         if self.state.help_visible {
@@ -235,8 +222,24 @@ impl App {
         Ok(())
     }
 
-    /// Renders the header bar.
+    /// Renders the header bar with title and help cue.
     fn render_header(&self, frame: &mut Frame, area: Rect) {
+        // Create the block first to get inner area (with rounded borders)
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded);
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        // Split inner area: title left, help cue right
+        let [title_area, help_area] = Layout::horizontal([
+            Constraint::Min(0),
+            Constraint::Length(17), // "Press ? for help" = 16 chars + padding
+        ])
+        .areas(inner);
+
+        // Render title on left
         let title = Paragraph::new(Line::from(vec![
             Span::styled(
                 "taim",
@@ -246,10 +249,17 @@ impl App {
             ),
             Span::raw(" - "),
             Span::styled("Kanban Board", Style::default().fg(Color::White)),
-        ]))
-        .block(Block::default().borders(Borders::ALL));
+        ]));
+        frame.render_widget(title, title_area);
 
-        frame.render_widget(title, area);
+        // Render help cue on right
+        let help_cue = Paragraph::new(Line::from(vec![
+            Span::styled("Press ", Style::default().fg(Color::DarkGray)),
+            Span::styled("?", Style::default().fg(Color::Yellow)),
+            Span::styled(" for help", Style::default().fg(Color::DarkGray)),
+        ]))
+        .alignment(Alignment::Right);
+        frame.render_widget(help_cue, help_area);
     }
 
     /// Renders the Kanban board with four lanes.
@@ -272,11 +282,6 @@ impl App {
         }
     }
 
-    /// Renders the footer with key hints.
-    fn render_footer(&self, frame: &mut Frame, area: Rect) {
-        let buf = frame.buffer_mut();
-        render_status_bar(area, buf);
-    }
 }
 
 #[cfg(test)]

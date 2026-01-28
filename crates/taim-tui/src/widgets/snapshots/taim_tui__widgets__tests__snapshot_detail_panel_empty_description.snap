@@ -2,23 +2,23 @@
 source: crates/taim-tui/src/widgets/tests.rs
 expression: buffer_to_string(&buf)
 ---
-┌ Task Details ────────────────────────┐
-│Title: No Description                 │
-│Status: ○ Idle                        │
-│Lane: Backlog                         │
-│                                      │
-│────────────────────────────────────  │
-│                                      │
-│Description:                          │
-│No description                        │
-│                                      │
-│────────────────────────────────────  │
-│                                      │
+╭ No Description ──────────────────────╮
+│○ Idle  │  Lane: Backlog              │
 │Created: 2025-01-15 10:30             │
 │Updated: 2025-01-15 10:30             │
+│──────────────────────────────────────│
+│No description                        │
 │                                      │
-│[Esc] Close                           │
 │                                      │
 │                                      │
 │                                      │
-└──────────────────────────────────────┘
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│──────────────────────────────────────│
+│[Esc] Back to board  [↑↓] Scroll      │
+╰──────────────────────────────────────╯

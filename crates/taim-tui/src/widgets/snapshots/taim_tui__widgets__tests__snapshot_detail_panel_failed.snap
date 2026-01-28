@@ -2,23 +2,23 @@
 source: crates/taim-tui/src/widgets/tests.rs
 expression: buffer_to_string(&buf)
 ---
-┌ Task Details ────────────────────────┐
-│Title: Failed Task                    │
-│Status: ✗ Failed                      │
-│Lane: Done                            │
-│                                      │
-│────────────────────────────────────  │
-│                                      │
-│Description:                          │
-│Error occurred during execution.      │
-│                                      │
-│────────────────────────────────────  │
-│                                      │
+╭ Failed Task ─────────────────────────╮
+│✗ Failed  │  Lane: Done               │
 │Created: 2025-01-15 10:30             │
 │Updated: 2025-01-15 10:30             │
+│──────────────────────────────────────│
+│Error occurred during execution.      │
 │                                      │
-│[Esc] Close                           │
 │                                      │
 │                                      │
 │                                      │
-└──────────────────────────────────────┘
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│──────────────────────────────────────│
+│[Esc] Back to board  [↑↓] Scroll      │
+╰──────────────────────────────────────╯

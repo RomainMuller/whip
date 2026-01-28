@@ -2,18 +2,18 @@
 source: crates/taim-tui/src/widgets/tests.rs
 expression: buffer_to_string(&buf)
 ---
-┌ Task Details ────────────────────────┐
-│                                      │
-│────────────────────────────────────  │
-│                                      │
-│Description:                          │
-│This is a very long description that  │
-│should require scrolling when         │
-│displayed. It contains multiple       │
+╭ Long Description Task ───────────────╮
+│● In Progress  │  Lane: In Progress   │
+│Created: 2025-01-15 10:30             │
+│Updated: 2025-01-15 10:30             │
+│──────────────────────────────────────│
 │sentences to ensure we have enough    │
 │content. The detail panel should      │
-│handle this gracefully by allowing    │
-│the user to scroll.                   │
+│handle this gracefully by allowing the│
+│user to scroll.                       │
 │                                      │
-│────────────────────────────────────  │
-└──────────────────────────────────────┘
+│                                      │
+│                                      │
+│──────────────────────────────────────│
+│[Esc] Back to board  [↑↓] Scroll      │
+╰──────────────────────────────────────╯

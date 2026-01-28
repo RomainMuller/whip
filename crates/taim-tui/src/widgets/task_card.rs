@@ -130,13 +130,18 @@ pub fn render_task_card(task: &Task, is_selected: bool, area: Rect, buf: &mut Bu
         Line::from(Span::styled(truncated_desc, desc_style)),
     ];
 
-    let card = Paragraph::new(content)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(border_color)),
-        )
-        .wrap(Wrap { trim: true });
+    let block = if is_selected {
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(Color::Rgb(40, 40, 50)))
+    } else {
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(border_color))
+    };
+
+    let card = Paragraph::new(content).block(block).wrap(Wrap { trim: true });
 
     card.render(area, buf);
 }
