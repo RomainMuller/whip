@@ -45,6 +45,9 @@ chrono = { version = "0.4", features = ["serde"] }
 proptest = { version = "1.5" }
 insta = { version = "1.41" }
 
+# Markdown parsing
+pulldown-cmark = { version = "0.12" }
+
 # Internal crates
 taim-protocol = { path = "crates/taim-protocol" }
 taim-tui = { path = "crates/taim-tui" }
