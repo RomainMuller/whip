@@ -15,5 +15,6 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+chrono = { workspace = true }
 proptest = { workspace = true }
 insta = { workspace = true }

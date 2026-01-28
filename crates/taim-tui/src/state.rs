@@ -214,6 +214,13 @@ impl AppState {
         lane.tasks.get(task_idx)
     }
 
+    /// Clears the current task selection.
+    ///
+    /// After calling this, `selected_task` will be `None`.
+    pub fn clear_selection(&mut self) {
+        self.selected_task = None;
+    }
+
     /// Ensures the task selection is valid for the current lane.
     fn clamp_task_selection(&mut self) {
         let lane = &self.board.lanes[self.selected_lane];
@@ -433,5 +440,18 @@ mod tests {
 
         assert!(!dismissed);
         assert!(!state.help_visible);
+    }
+
+    #[test]
+    fn clear_selection_removes_task_selection() {
+        let mut board = KanbanBoard::new();
+        board.add_task(Task::new("Task 1", "Description"));
+
+        let mut state = AppState::new(board);
+        state.navigate_down(); // Select first task
+        assert!(state.selected_task.is_some());
+
+        state.clear_selection();
+        assert!(state.selected_task.is_none());
     }
 }

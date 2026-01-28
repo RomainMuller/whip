@@ -13,7 +13,7 @@ expression: buffer_to_string(&buf)
   │  Actions                        │
   │  Enter      Open details        │
   │  Esc        Close panel         │
-  │  q          Quit                │
+  │  Ctrl+C     Quit                │
   │  ?          Toggle help         │
   │                                 │
   └─────────────────────────────────┘

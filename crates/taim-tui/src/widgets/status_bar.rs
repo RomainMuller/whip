@@ -25,7 +25,7 @@ use ratatui::{
 ///
 /// ```text
 /// +----------------------------------------------------+
-/// | [q] Quit  [←→↑↓] Navigate  [Enter] Select          |
+/// | [Ctrl+C] Quit  [←→↑↓] Navigate  [Enter] Select     |
 /// +----------------------------------------------------+
 /// ```
 ///
@@ -46,7 +46,7 @@ pub fn render_status_bar(area: Rect, buf: &mut Buffer) {
     let text_style = Style::default().fg(Color::White);
 
     let hints = Line::from(vec![
-        Span::styled("q", key_style),
+        Span::styled("Ctrl+C", key_style),
         Span::styled(" Quit  ", text_style),
         Span::styled("←→↑↓", key_style),
         Span::styled(" Navigate  ", text_style),
@@ -90,7 +90,7 @@ pub fn render_status_bar_with_message(message: &str, area: Rect, buf: &mut Buffe
     let hints = Line::from(vec![
         Span::styled(message, message_style),
         Span::styled("  |  ", text_style),
-        Span::styled("q", key_style),
+        Span::styled("Ctrl+C", key_style),
         Span::styled(" Quit  ", text_style),
         Span::styled("?", key_style),
         Span::styled(" Help", text_style),

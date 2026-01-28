@@ -3,5 +3,5 @@ source: crates/taim-tui/src/widgets/tests.rs
 expression: buffer_to_string(&buf)
 ---
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│q Quit  ←→↑↓ Navigate  Enter Select                                           │
+│Ctrl+C Quit  ←→↑↓ Navigate  Enter Select                                      │
 └──────────────────────────────────────────────────────────────────────────────┘

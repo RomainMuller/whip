@@ -2,8 +2,19 @@
 //!
 //! These tests use insta to capture and verify the visual output of widgets.
 
+use chrono::{TimeZone, Utc};
 use ratatui::{buffer::Buffer, layout::Rect};
 use taim_protocol::{KanbanBoard, LaneKind, Task, TaskState};
+
+/// Creates a test task with fixed timestamps for reproducible snapshots.
+fn test_task(title: &str, description: &str) -> Task {
+    let mut task = Task::new(title, description);
+    // Use a fixed timestamp for reproducible snapshots
+    let fixed_time = Utc.with_ymd_and_hms(2025, 1, 15, 10, 30, 0).unwrap();
+    task.created_at = fixed_time;
+    task.updated_at = fixed_time;
+    task
+}
 
 use super::{
     render_board, render_detail_panel, render_help_overlay, render_lane, render_status_bar,
@@ -231,7 +242,7 @@ fn snapshot_board_narrow_terminal() {
 
 #[test]
 fn snapshot_detail_panel_idle() {
-    let mut task = Task::new(
+    let mut task = test_task(
         "Idle Task",
         "This task is waiting to be started. It has a longer description to test text wrapping in the detail panel.",
     );
@@ -247,7 +258,7 @@ fn snapshot_detail_panel_idle() {
 
 #[test]
 fn snapshot_detail_panel_inflight() {
-    let mut task = Task::new("Active Task", "Work in progress on this feature.");
+    let mut task = test_task("Active Task", "Work in progress on this feature.");
     task.state = TaskState::InFlight;
     task.lane = LaneKind::InProgress;
 
@@ -261,7 +272,7 @@ fn snapshot_detail_panel_inflight() {
 
 #[test]
 fn snapshot_detail_panel_needs_attention() {
-    let mut task = Task::new(
+    let mut task = test_task(
         "Blocked Task",
         "Waiting for input from the product manager.",
     );
@@ -278,7 +289,7 @@ fn snapshot_detail_panel_needs_attention() {
 
 #[test]
 fn snapshot_detail_panel_success() {
-    let mut task = Task::new("Completed Task", "Successfully finished and deployed.");
+    let mut task = test_task("Completed Task", "Successfully finished and deployed.");
     task.state = TaskState::Success;
     task.lane = LaneKind::Done;
 
@@ -292,7 +303,7 @@ fn snapshot_detail_panel_success() {
 
 #[test]
 fn snapshot_detail_panel_failed() {
-    let mut task = Task::new("Failed Task", "Error occurred during execution.");
+    let mut task = test_task("Failed Task", "Error occurred during execution.");
     task.state = TaskState::Failed;
     task.lane = LaneKind::Done;
 
@@ -306,7 +317,7 @@ fn snapshot_detail_panel_failed() {
 
 #[test]
 fn snapshot_detail_panel_with_scroll() {
-    let mut task = Task::new(
+    let mut task = test_task(
         "Long Description Task",
         "This is a very long description that should require scrolling when displayed. \
          It contains multiple sentences to ensure we have enough content. \
@@ -326,7 +337,7 @@ fn snapshot_detail_panel_with_scroll() {
 
 #[test]
 fn snapshot_detail_panel_empty_description() {
-    let mut task = Task::new("No Description", "");
+    let mut task = test_task("No Description", "");
     task.state = TaskState::Idle;
 
     let area = Rect::new(0, 0, 40, 20);

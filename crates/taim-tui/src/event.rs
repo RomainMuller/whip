@@ -36,8 +36,8 @@ pub fn poll_event() -> std::io::Result<Option<Event>> {
 ///
 /// | Key | Action |
 /// |-----|--------|
-/// | `q` or `Esc` | Quit |
 /// | `Ctrl+C` | Quit |
+/// | `Esc` | Escape (close panel or clear selection) |
 /// | `Left` | Navigate left |
 /// | `Right` | Navigate right |
 /// | `Up` | Navigate up |
@@ -55,8 +55,8 @@ pub fn key_to_message(key: KeyEvent) -> Option<Message> {
 
     // Regular keys
     match key.code {
-        // Quit
-        KeyCode::Char('q') | KeyCode::Esc => Some(Message::Quit),
+        // Escape (contextual: close panel or clear selection)
+        KeyCode::Esc => Some(Message::Escape),
 
         // Navigation (arrow keys only)
         KeyCode::Left => Some(Message::NavigateLeft),
@@ -96,17 +96,23 @@ mod tests {
 
     #[test]
     fn quit_keys() {
-        assert_eq!(
-            key_to_message(make_key(KeyCode::Char('q'))),
-            Some(Message::Quit)
-        );
-        assert_eq!(key_to_message(make_key(KeyCode::Esc)), Some(Message::Quit));
+        // Only Ctrl+C quits
         assert_eq!(
             key_to_message(make_key_with_modifiers(
                 KeyCode::Char('c'),
                 KeyModifiers::CONTROL
             )),
             Some(Message::Quit)
+        );
+        // 'q' is no longer a quit key
+        assert_eq!(key_to_message(make_key(KeyCode::Char('q'))), None);
+    }
+
+    #[test]
+    fn escape_key() {
+        assert_eq!(
+            key_to_message(make_key(KeyCode::Esc)),
+            Some(Message::Escape)
         );
     }
 

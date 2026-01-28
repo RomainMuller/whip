@@ -77,7 +77,7 @@ impl App {
                 Message::Quit => {
                     self.should_quit = true;
                 }
-                Message::ToggleHelp => {
+                Message::ToggleHelp | Message::Escape => {
                     self.state.toggle_help();
                 }
                 // Any other key dismisses help
@@ -91,6 +91,14 @@ impl App {
         match msg {
             Message::Quit => {
                 self.should_quit = true;
+            }
+            Message::Escape => {
+                // Contextual escape: close detail panel if open, or clear selection
+                if self.state.detail_visible {
+                    self.state.toggle_detail();
+                } else {
+                    self.state.clear_selection();
+                }
             }
             Message::NavigateLeft => {
                 if self.state.focus == Focus::Board {
@@ -374,5 +382,47 @@ mod tests {
 
         app.update(Message::Quit);
         assert!(app.should_quit);
+    }
+
+    #[test]
+    fn app_escape_closes_detail_panel() {
+        let mut board = KanbanBoard::new();
+        board.add_task(taim_protocol::Task::new("Task 1", "Description"));
+
+        let mut app = App::new(board);
+        app.update(Message::NavigateDown); // Select a task
+        app.update(Message::Select); // Open detail panel
+        assert!(app.state.detail_visible);
+
+        app.update(Message::Escape);
+        assert!(!app.state.detail_visible);
+        assert!(!app.should_quit); // Should NOT quit
+    }
+
+    #[test]
+    fn app_escape_clears_selection_when_no_detail() {
+        let mut board = KanbanBoard::new();
+        board.add_task(taim_protocol::Task::new("Task 1", "Description"));
+
+        let mut app = App::new(board);
+        app.update(Message::NavigateDown); // Select a task
+        assert!(app.state.selected_task.is_some());
+
+        app.update(Message::Escape);
+        assert!(app.state.selected_task.is_none());
+        assert!(!app.should_quit); // Should NOT quit
+    }
+
+    #[test]
+    fn app_escape_dismisses_help() {
+        let board = KanbanBoard::new();
+        let mut app = App::new(board);
+
+        app.update(Message::ToggleHelp);
+        assert!(app.state.help_visible);
+
+        app.update(Message::Escape);
+        assert!(!app.state.help_visible);
+        assert!(!app.should_quit); // Should NOT quit
     }
 }
