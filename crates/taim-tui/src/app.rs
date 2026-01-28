@@ -18,7 +18,10 @@ use crate::{
     AppState, Focus,
     event::{event_to_message, poll_event},
     terminal::AppTerminal,
-    widgets::{render_board, render_detail_panel, render_help_overlay},
+    widgets::{
+        description_area_dimensions, max_scroll_offset, render_board, render_detail_panel,
+        render_help_overlay,
+    },
 };
 
 /// Height of the header bar in rows.
@@ -123,6 +126,7 @@ impl App {
                     self.state.navigate_up();
                 } else if self.state.focus == Focus::Detail {
                     self.state.scroll_detail(-1);
+                    self.clamp_scroll_to_content();
                 }
             }
             Message::NavigateDown => {
@@ -130,6 +134,7 @@ impl App {
                     self.state.navigate_down();
                 } else if self.state.focus == Focus::Detail {
                     self.state.scroll_detail(1);
+                    self.clamp_scroll_to_content();
                 }
             }
             Message::Select => {
@@ -200,6 +205,37 @@ impl App {
             // Open detail view
             self.state.toggle_detail();
         }
+    }
+
+    /// Clamps the detail scroll offset to prevent scrolling past content.
+    ///
+    /// Uses the last known terminal area to compute the maximum valid scroll offset.
+    fn clamp_scroll_to_content(&mut self) {
+        // Get the selected task; if none, nothing to clamp
+        let Some(task) = self.state.selected_task() else {
+            return;
+        };
+
+        // Compute the detail panel area (content area below header)
+        let detail_area = Rect {
+            x: self.last_area.x,
+            y: self.last_area.y + HEADER_HEIGHT,
+            width: self.last_area.width,
+            height: self.last_area.height.saturating_sub(HEADER_HEIGHT),
+        };
+
+        // Get the description area dimensions
+        let Some((visible_height, panel_width)) =
+            description_area_dimensions(task, detail_area)
+        else {
+            // Area too small, clamp to 0
+            self.state.clamp_detail_scroll(0);
+            return;
+        };
+
+        // Compute and apply the maximum scroll offset
+        let max = max_scroll_offset(task, visible_height, panel_width);
+        self.state.clamp_detail_scroll(max);
     }
 
     /// Renders the application UI to the given frame.
@@ -587,5 +623,75 @@ mod tests {
         // Try clicking on second task - should be ignored
         app.update(Message::ClickAt { column: 5, row: 8 });
         assert_eq!(app.state.selected_task, Some(0)); // Still first task
+    }
+
+    #[test]
+    fn app_scroll_clamped_to_content_bounds() {
+        let mut board = KanbanBoard::new();
+        // Create a task with a short description that won't require scrolling
+        board.add_task(taim_protocol::Task::new("Task 1", "Short description"));
+
+        let mut app = App::new(board);
+        // Simulate a reasonably sized terminal
+        app.last_area = Rect::new(0, 0, 80, 24);
+
+        // Open detail panel
+        app.update(Message::NavigateDown);
+        app.update(Message::Select);
+        assert!(app.state.detail_visible);
+        assert_eq!(app.state.focus, Focus::Detail);
+
+        // Try to scroll down many times - should be clamped
+        for _ in 0..100 {
+            app.update(Message::NavigateDown);
+        }
+
+        // With a short description and a 24-line terminal, the max scroll should be 0
+        // The scroll should be clamped to 0 (no scrolling needed)
+        assert_eq!(
+            app.state.detail_scroll, 0,
+            "Scroll should be clamped to 0 for short content"
+        );
+    }
+
+    #[test]
+    fn app_scroll_allows_scrolling_long_content() {
+        let mut board = KanbanBoard::new();
+        // Create a task with a very long description that will need scrolling
+        let long_description = "This is a very long description. ".repeat(50);
+        board.add_task(taim_protocol::Task::new("Task 1", &long_description));
+
+        let mut app = App::new(board);
+        // Simulate a reasonably sized terminal
+        app.last_area = Rect::new(0, 0, 80, 24);
+
+        // Open detail panel
+        app.update(Message::NavigateDown);
+        app.update(Message::Select);
+        assert!(app.state.detail_visible);
+
+        // Scroll down a few times
+        app.update(Message::NavigateDown);
+        app.update(Message::NavigateDown);
+        app.update(Message::NavigateDown);
+
+        // With long content, we should be able to scroll
+        assert!(
+            app.state.detail_scroll > 0,
+            "Should be able to scroll with long content"
+        );
+
+        // Try to scroll way past the content
+        for _ in 0..1000 {
+            app.update(Message::NavigateDown);
+        }
+
+        // The scroll should be clamped to the maximum valid value
+        // For this test, we just verify it's not absurdly high
+        assert!(
+            app.state.detail_scroll < 1000,
+            "Scroll should be clamped to a reasonable max, got {}",
+            app.state.detail_scroll
+        );
     }
 }

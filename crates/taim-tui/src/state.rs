@@ -175,7 +175,11 @@ impl AppState {
     /// Scrolls the detail panel by the given delta.
     ///
     /// Positive delta scrolls down, negative scrolls up.
-    /// The scroll offset is clamped to valid bounds.
+    /// The scroll offset is clamped to prevent underflow (scrolling above content).
+    ///
+    /// Note: To prevent scrolling past the end of content, call `clamp_detail_scroll()`
+    /// after this method with the appropriate maximum value computed from
+    /// `max_scroll_offset()`.
     ///
     /// # Arguments
     ///
@@ -186,6 +190,32 @@ impl AppState {
         } else {
             self.detail_scroll = self.detail_scroll.saturating_sub(delta.unsigned_abs());
         }
+    }
+
+    /// Clamps the detail scroll offset to a maximum value.
+    ///
+    /// Call this after scroll operations with the result of `max_scroll_offset()`
+    /// to prevent scrolling past the end of the content.
+    ///
+    /// # Arguments
+    ///
+    /// * `max` - The maximum valid scroll offset
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use taim_protocol::KanbanBoard;
+    /// use taim_tui::AppState;
+    ///
+    /// let board = KanbanBoard::new();
+    /// let mut state = AppState::new(board);
+    ///
+    /// state.scroll_detail(100); // Scroll way down
+    /// state.clamp_detail_scroll(5); // Clamp to max of 5
+    /// assert_eq!(state.detail_scroll, 5);
+    /// ```
+    pub fn clamp_detail_scroll(&mut self, max: u16) {
+        self.detail_scroll = self.detail_scroll.min(max);
     }
 
     /// Returns a reference to the currently selected task, if any.
@@ -370,6 +400,36 @@ mod tests {
 
         state.detail_scroll = 5;
         state.scroll_detail(-10);
+        assert_eq!(state.detail_scroll, 0);
+    }
+
+    #[test]
+    fn clamp_detail_scroll_reduces_to_max() {
+        let board = KanbanBoard::new();
+        let mut state = AppState::new(board);
+
+        state.detail_scroll = 100;
+        state.clamp_detail_scroll(10);
+        assert_eq!(state.detail_scroll, 10);
+    }
+
+    #[test]
+    fn clamp_detail_scroll_does_not_increase() {
+        let board = KanbanBoard::new();
+        let mut state = AppState::new(board);
+
+        state.detail_scroll = 5;
+        state.clamp_detail_scroll(100);
+        assert_eq!(state.detail_scroll, 5);
+    }
+
+    #[test]
+    fn clamp_detail_scroll_with_zero_max() {
+        let board = KanbanBoard::new();
+        let mut state = AppState::new(board);
+
+        state.detail_scroll = 10;
+        state.clamp_detail_scroll(0);
         assert_eq!(state.detail_scroll, 0);
     }
 
