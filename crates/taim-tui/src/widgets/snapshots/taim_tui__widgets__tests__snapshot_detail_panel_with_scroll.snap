@@ -1,0 +1,19 @@
+---
+source: crates/taim-tui/src/widgets/tests.rs
+expression: buffer_to_string(&buf)
+---
+┌ Task Details ────────────────────────┐
+│                                      │
+│────────────────────────────────────  │
+│                                      │
+│Description:                          │
+│This is a very long description that  │
+│should require scrolling when         │
+│displayed. It contains multiple       │
+│sentences to ensure we have enough    │
+│content. The detail panel should      │
+│handle this gracefully by allowing    │
+│the user to scroll.                   │
+│                                      │
+│────────────────────────────────────  │
+└──────────────────────────────────────┘

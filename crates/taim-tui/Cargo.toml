@@ -1,0 +1,19 @@
+[package]
+name = "taim-tui"
+version = "0.0.1-dev"
+description = "Terminal UI for taim - Ratatui-based Kanban board interface"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+taim-protocol = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+insta = { workspace = true }

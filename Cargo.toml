@@ -6,6 +6,12 @@ authors = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
 
+[dependencies]
+anyhow = { workspace = true }
+taim-protocol = { workspace = true }
+taim-tui = { workspace = true }
+tokio = { workspace = true }
+
 [workspace]
 resolver = "3"
 members = ["crates/*"]
@@ -20,8 +26,16 @@ license = "MIT"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
 
+# Async runtime
+tokio = { version = "1.43", features = ["full"] }
+
+# TUI
+ratatui = { version = "0.29" }
+crossterm = { version = "0.28" }
+
 # Error handling
 thiserror = { version = "2.0" }
+anyhow = { version = "1.0" }
 
 # Utilities
 uuid = { version = "1.11", features = ["v4", "serde"] }
@@ -29,3 +43,8 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Testing
 proptest = { version = "1.5" }
+insta = { version = "1.41" }
+
+# Internal crates
+taim-protocol = { path = "crates/taim-protocol" }
+taim-tui = { path = "crates/taim-tui" }

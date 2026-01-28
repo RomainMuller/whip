@@ -1,0 +1,20 @@
+---
+source: crates/taim-tui/src/widgets/tests.rs
+assertion_line: 107
+expression: buffer_to_string(&buf)
+---
+┌Backlog (0)────────────┐
+│No tasks               │
+│                       │
+│                       │
+│                       │
+│                       │
+│                       │
+│                       │
+│                       │
+│                       │
+│                       │
+│                       │
+│                       │
+│                       │
+└───────────────────────┘

@@ -1,0 +1,24 @@
+---
+source: crates/taim-tui/src/widgets/tests.rs
+expression: buffer_to_string(&buf)
+---
+
+
+
+                      ┌ Help ───────────────────────────┐
+                      │                                 │
+                      │  Navigation                     │
+                      │  ←          Move left           │
+                      │  →          Move right          │
+                      │  ↑          Select previous     │
+                      │  ↓          Select next         │
+                      │                                 │
+                      │  Actions                        │
+                      │  Enter      Open details        │
+                      │  Esc        Close panel         │
+                      │  q          Quit                │
+                      │  ?          Toggle help         │
+                      │                                 │
+                      │  Press any key to close         │
+                      │                                 │
+                      └─────────────────────────────────┘

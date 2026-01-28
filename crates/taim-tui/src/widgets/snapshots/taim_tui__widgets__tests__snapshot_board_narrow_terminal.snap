@@ -1,0 +1,20 @@
+---
+source: crates/taim-tui/src/widgets/tests.rs
+assertion_line: 226
+expression: buffer_to_string(&buf)
+---
+┌Backlog (2)──┐┌In Progress (┐┌Under Review ┐┌Done (2)─────┐
+│┌───────────┐││┌───────────┐││┌───────────┐││┌───────────┐│
+││Design UI  ││││Implement  ││││Code       ││││Setup CI/CD││
+││mockups    ││││parser     ││││review:    ││││Configur...││
+│└───────────┘││└───────────┘││└───────────┘││└───────────┘│
+│┌───────────┐││             ││             ││┌───────────┐│
+││Write specs│││             ││             │││Fix login  ││
+││Document...│││             ││             │││bug        ││
+│└───────────┘││             ││             ││└───────────┘│
+│             ││             ││             ││             │
+│             ││             ││             ││             │
+│             ││             ││             ││             │
+│             ││             ││             ││             │
+│             ││             ││             ││             │
+└─────────────┘└─────────────┘└─────────────┘└─────────────┘
