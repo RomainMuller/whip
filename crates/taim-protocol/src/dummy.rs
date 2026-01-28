@@ -140,6 +140,15 @@ pub fn dummy_board() -> KanbanBoard {
              ## Supported Formats\n\
              - **TOML** (primary)\n\
              - YAML (optional)\n\n\
+             ## Configuration Options\n\n\
+             | Option | Type | Default | Environment | Description |\n\
+             |--------|------|---------|-------------|-------------|\n\
+             | `session.timeout` | integer | 300 | `TAIM_TIMEOUT` | Session timeout in seconds |\n\
+             | `session.max_retries` | integer | 3 | `TAIM_RETRIES` | Max retry attempts |\n\
+             | `ui.theme` | string | \"dark\" | `TAIM_THEME` | Color theme (dark/light) |\n\
+             | `ui.refresh_rate` | integer | 60 | `TAIM_REFRESH` | UI refresh rate in Hz |\n\
+             | `log.level` | string | \"info\" | `TAIM_LOG` | Log level (debug/info/warn) |\n\
+             | `log.file` | path | none | `TAIM_LOG_FILE` | Optional log file path |\n\n\
              ## Configuration Sources\n\
              Priority order (highest to lowest):\n\
              1. Command-line arguments\n\

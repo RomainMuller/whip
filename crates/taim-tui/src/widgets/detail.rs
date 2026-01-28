@@ -222,7 +222,10 @@ fn render_metadata(task: &Task, area: Rect, buf: &mut Buffer) {
                 Style::default().fg(Color::White),
             ),
             Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("{indicator} "), Style::default().fg(indicator_color)),
+            Span::styled(
+                format!("{indicator} "),
+                Style::default().fg(indicator_color),
+            ),
             Span::styled(state_name, Style::default().fg(state_color(task.state))),
             Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
             Span::styled("Created: ", Style::default().fg(Color::DarkGray)),
@@ -250,7 +253,10 @@ fn render_metadata(task: &Task, area: Rect, buf: &mut Buffer) {
                     Style::default().fg(Color::White),
                 ),
                 Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(format!("{indicator} "), Style::default().fg(indicator_color)),
+                Span::styled(
+                    format!("{indicator} "),
+                    Style::default().fg(indicator_color),
+                ),
                 Span::styled(state_name, Style::default().fg(state_color(task.state))),
             ]),
             Line::from(vec![
@@ -274,7 +280,10 @@ fn render_metadata(task: &Task, area: Rect, buf: &mut Buffer) {
                     Style::default().fg(Color::White),
                 ),
                 Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(format!("{indicator} "), Style::default().fg(indicator_color)),
+                Span::styled(
+                    format!("{indicator} "),
+                    Style::default().fg(indicator_color),
+                ),
                 Span::styled(state_name, Style::default().fg(state_color(task.state))),
             ]),
             Line::from(vec![
@@ -747,6 +756,9 @@ mod tests {
         let offset = max_scroll_offset(&task, 3, 30);
 
         // Should return a positive value since description is longer than visible area
-        assert!(offset > 0, "offset should be > 0 for long description, got {offset}");
+        assert!(
+            offset > 0,
+            "offset should be > 0 for long description, got {offset}"
+        );
     }
 }

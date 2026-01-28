@@ -78,8 +78,12 @@ pub fn setup_terminal() -> Result<AppTerminal, TerminalError> {
 /// ```
 pub fn restore_terminal(terminal: &mut AppTerminal) -> Result<(), TerminalError> {
     disable_raw_mode().map_err(TerminalError::Restore)?;
-    execute!(terminal.backend_mut(), DisableMouseCapture, LeaveAlternateScreen)
-        .map_err(TerminalError::Restore)?;
+    execute!(
+        terminal.backend_mut(),
+        DisableMouseCapture,
+        LeaveAlternateScreen
+    )
+    .map_err(TerminalError::Restore)?;
     terminal.show_cursor().map_err(TerminalError::Restore)?;
     Ok(())
 }

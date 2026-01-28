@@ -225,8 +225,7 @@ impl App {
         };
 
         // Get the description area dimensions
-        let Some((visible_height, panel_width)) =
-            description_area_dimensions(task, detail_area)
+        let Some((visible_height, panel_width)) = description_area_dimensions(task, detail_area)
         else {
             // Area too small, clamp to 0
             self.state.clamp_detail_scroll(0);
@@ -379,7 +378,6 @@ impl App {
             render_detail_panel(task, self.state.detail_scroll, area, buf);
         }
     }
-
 }
 
 #[cfg(test)]
@@ -567,7 +565,10 @@ mod tests {
         let mut board = KanbanBoard::new();
         board.add_task(taim_protocol::Task::new("Task 1", "Description"));
         // Move task to lane 2 (Under Review)
-        board.move_task(board.lanes[0].tasks[0].id, taim_protocol::LaneKind::UnderReview);
+        board.move_task(
+            board.lanes[0].tasks[0].id,
+            taim_protocol::LaneKind::UnderReview,
+        );
 
         let mut app = App::new(board);
         app.last_area = Rect::new(0, 0, 80, 24);

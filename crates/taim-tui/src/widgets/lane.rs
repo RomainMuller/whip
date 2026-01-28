@@ -30,9 +30,9 @@ pub enum LanePosition {
 /// Border set for the first (leftmost) lane: rounded corners on left, no right border.
 const BORDER_SET_FIRST: border::Set = border::Set {
     top_left: "╭",
-    top_right: "─",     // No corner, just continues the line
+    top_right: "─", // No corner, just continues the line
     bottom_left: "╰",
-    bottom_right: "─",  // No corner, just continues the line
+    bottom_right: "─", // No corner, just continues the line
     vertical_left: "│",
     vertical_right: " ", // No right border
     horizontal_top: "─",
@@ -41,10 +41,10 @@ const BORDER_SET_FIRST: border::Set = border::Set {
 
 /// Border set for middle lanes: T-connectors on left, no right border.
 const BORDER_SET_MIDDLE: border::Set = border::Set {
-    top_left: "┬",      // T-connector joining from previous lane
-    top_right: "─",     // No corner, just continues the line
-    bottom_left: "┴",   // T-connector joining from previous lane
-    bottom_right: "─",  // No corner, just continues the line
+    top_left: "┬",     // T-connector joining from previous lane
+    top_right: "─",    // No corner, just continues the line
+    bottom_left: "┴",  // T-connector joining from previous lane
+    bottom_right: "─", // No corner, just continues the line
     vertical_left: "│",
     vertical_right: " ", // No right border
     horizontal_top: "─",
@@ -53,10 +53,10 @@ const BORDER_SET_MIDDLE: border::Set = border::Set {
 
 /// Border set for the last (rightmost) lane: T-connectors on left, rounded on right.
 const BORDER_SET_LAST: border::Set = border::Set {
-    top_left: "┬",      // T-connector joining from previous lane
-    top_right: "╮",     // Rounded corner on outer edge
-    bottom_left: "┴",   // T-connector joining from previous lane
-    bottom_right: "╯",  // Rounded corner on outer edge
+    top_left: "┬",     // T-connector joining from previous lane
+    top_right: "╮",    // Rounded corner on outer edge
+    bottom_left: "┴",  // T-connector joining from previous lane
+    bottom_right: "╯", // Rounded corner on outer edge
     vertical_left: "│",
     vertical_right: "│",
     horizontal_top: "─",
@@ -269,7 +269,15 @@ mod tests {
         let area = Rect::new(0, 0, 20, 15);
         let mut buf = Buffer::empty(area);
 
-        render_lane(&lane, false, None, area, &mut buf, LanePosition::First, false);
+        render_lane(
+            &lane,
+            false,
+            None,
+            area,
+            &mut buf,
+            LanePosition::First,
+            false,
+        );
 
         // Convert buffer to string and check for placeholder
         let content = buffer_to_string(&buf);
@@ -285,7 +293,15 @@ mod tests {
         let area = Rect::new(0, 0, 25, 15);
         let mut buf = Buffer::empty(area);
 
-        render_lane(&lane, true, Some(0), area, &mut buf, LanePosition::Middle, false);
+        render_lane(
+            &lane,
+            true,
+            Some(0),
+            area,
+            &mut buf,
+            LanePosition::Middle,
+            false,
+        );
 
         let content = buffer_to_string(&buf);
         assert!(content.contains("In Progress"));

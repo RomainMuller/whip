@@ -141,7 +141,9 @@ pub fn render_task_card(task: &Task, is_selected: bool, area: Rect, buf: &mut Bu
             .border_style(Style::default().fg(border_color))
     };
 
-    let card = Paragraph::new(content).block(block).wrap(Wrap { trim: true });
+    let card = Paragraph::new(content)
+        .block(block)
+        .wrap(Wrap { trim: true });
 
     card.render(area, buf);
 }
