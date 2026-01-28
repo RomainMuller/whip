@@ -1,11 +1,12 @@
 ---
 source: crates/taim-tui/src/widgets/tests.rs
+assertion_line: 391
 expression: buffer_to_string(&buf)
 ---
 
 
 
-                      ┌ Help ───────────────────────────┐
+                      ╭ Help ───────────────────────────╮
                       │                                 │
                       │  Navigation                     │
                       │  ←          Move left           │
@@ -21,4 +22,4 @@ expression: buffer_to_string(&buf)
                       │                                 │
                       │  Press any key to close         │
                       │                                 │
-                      └─────────────────────────────────┘
+                      ╰─────────────────────────────────╯

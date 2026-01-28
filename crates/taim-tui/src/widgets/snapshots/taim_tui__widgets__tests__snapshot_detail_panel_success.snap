@@ -3,7 +3,7 @@ source: crates/taim-tui/src/widgets/tests.rs
 expression: buffer_to_string(&buf)
 ---
 ╭ Completed Task ──────────────────────╮
-│✓ Success  │  Lane: Done              │
+│Lane: Done  │  ✓ Success              │
 │Created: 2025-01-15 10:30             │
 │Updated: 2025-01-15 10:30             │
 │──────────────────────────────────────│
