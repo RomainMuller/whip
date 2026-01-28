@@ -41,7 +41,7 @@ const HELP_HEIGHT: u16 = 17;
 /// |  Actions                       |
 /// |  Enter      Open details       |
 /// |  Esc        Close panel        |
-/// |  q          Quit               |
+/// |  Ctrl+C     Quit               |
 /// |  ?          Toggle help        |
 /// |                                |
 /// |  Press any key to close        |
@@ -128,7 +128,7 @@ fn build_help_lines() -> Vec<Line<'static>> {
             Span::styled("Close panel", text_style),
         ]),
         Line::from(vec![
-            Span::styled("  q          ", key_style),
+            Span::styled("  Ctrl+C     ", key_style),
             Span::styled("Quit", text_style),
         ]),
         Line::from(vec![

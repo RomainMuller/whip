@@ -33,6 +33,8 @@ pub enum Message {
     Select,
     /// Go back to the previous view or cancel current action.
     Back,
+    /// Escape: close panel or clear selection (contextual).
+    Escape,
     /// Quit the application.
     Quit,
     /// Refresh the board state.
@@ -109,6 +111,7 @@ mod tests {
             Message::NavigateDown,
             Message::Select,
             Message::Back,
+            Message::Escape,
             Message::Quit,
             Message::Refresh,
             Message::ToggleHelp,

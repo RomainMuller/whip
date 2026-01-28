@@ -844,6 +844,7 @@ name = "taim-tui"
 version = "0.0.1-dev"
 dependencies = [
  "anyhow",
+ "chrono",
  "crossterm",
  "insta",
  "proptest",
