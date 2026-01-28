@@ -125,7 +125,11 @@ impl App {
                 }
             }
             Message::Select => {
-                self.state.toggle_detail();
+                // Only open detail if a task is actually selected
+                if self.state.selected_task.is_some() {
+                    self.state.toggle_detail();
+                }
+                // Otherwise do nothing (could ring bell, but simpler to ignore)
             }
             Message::Back => {
                 if self.state.detail_visible {
@@ -320,9 +324,23 @@ mod tests {
     }
 
     #[test]
-    fn app_select_toggles_detail() {
+    fn app_select_does_nothing_without_task() {
         let board = KanbanBoard::new();
         let mut app = App::new(board);
+
+        assert!(!app.state.detail_visible);
+        app.update(Message::Select);
+        // Should NOT toggle detail when no task is selected
+        assert!(!app.state.detail_visible);
+    }
+
+    #[test]
+    fn app_select_toggles_detail_with_task() {
+        let mut board = KanbanBoard::new();
+        board.add_task(taim_protocol::Task::new("Task 1", "Description"));
+
+        let mut app = App::new(board);
+        app.update(Message::NavigateDown); // Select the task
 
         assert!(!app.state.detail_visible);
         app.update(Message::Select);
