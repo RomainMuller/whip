@@ -560,6 +560,43 @@ pub fn max_scroll_offset(task: &Task, visible_height: u16, panel_width: u16) -> 
     total_lines.saturating_sub(visible_height)
 }
 
+/// Calculates the description area dimensions for a given panel area and task.
+///
+/// This computes the height and width of the scrollable description area
+/// within the detail panel, accounting for borders, metadata, separators, and footer.
+///
+/// Returns `(visible_height, content_width)` or `None` if the area is too small.
+///
+/// # Arguments
+///
+/// * `task` - The task being displayed (needed for metadata height calculation)
+/// * `area` - The full area of the detail panel (including borders)
+#[must_use]
+pub fn description_area_dimensions(task: &Task, area: Rect) -> Option<(u16, u16)> {
+    // Minimum area check (same as render_detail_panel)
+    if area.width < 20 || area.height < 10 {
+        return None;
+    }
+
+    // Account for the outer block borders (2 rows, 2 columns)
+    let inner_height = area.height.saturating_sub(2);
+    let inner_width = area.width.saturating_sub(2);
+
+    // Calculate metadata height (same logic as in render_detail_panel)
+    let metadata_height = calculate_metadata_height(task, inner_width);
+
+    // Layout: Metadata + Separator (1) + Description (flex) + Separator (1) + Footer (1)
+    // Description height = inner_height - metadata_height - 3
+    let description_height = inner_height.saturating_sub(metadata_height + 3);
+
+    // Minimum of 1 line for description
+    if description_height == 0 {
+        return None;
+    }
+
+    Some((description_height, inner_width))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
