@@ -91,13 +91,16 @@ pub fn dummy_board() -> KanbanBoard {
     board.add_task(
         TaskBuilder::new(
             "Set up CI/CD pipeline",
-            "Configure GitHub Actions for automated testing and deployment.\n\n\
-             Include:\n\
-             - Rust toolchain setup\n\
-             - Cargo test\n\
-             - Cargo clippy\n\
-             - Cargo fmt check\n\
-             - Release builds",
+            "## Overview\n\
+             Configure **GitHub Actions** for automated testing and deployment.\n\n\
+             ## Checklist\n\
+             1. Set up Rust toolchain with `actions-rs/toolchain`\n\
+             2. Run `cargo test --workspace`\n\
+             3. Run `cargo clippy -- -D warnings`\n\
+             4. Check formatting with `cargo fmt --check`\n\
+             5. Build release binaries\n\n\
+             ## Notes\n\
+             *Priority*: High - blocks other CI-dependent work",
         )
         .state(TaskState::Idle)
         .lane(LaneKind::Backlog)
@@ -107,8 +110,22 @@ pub fn dummy_board() -> KanbanBoard {
     board.add_task(
         TaskBuilder::new(
             "Write API documentation",
-            "Document all public APIs with examples.\n\n\
-             Use rustdoc conventions and ensure all public items have doc comments.",
+            "## Goal\n\
+             Document all **public APIs** with comprehensive examples.\n\n\
+             ## Standards\n\
+             - Follow *rustdoc* conventions\n\
+             - Include `# Examples` section for each public function\n\
+             - Document **panics** and **errors** where applicable\n\n\
+             ## Example Template\n\
+             ```rust\n\
+             /// Creates a new session.\n\
+             ///\n\
+             /// # Examples\n\
+             /// ```\n\
+             /// let session = Session::new();\n\
+             /// ```\n\
+             pub fn new() -> Self { ... }\n\
+             ```",
         )
         .state(TaskState::Idle)
         .lane(LaneKind::Backlog)
@@ -118,11 +135,24 @@ pub fn dummy_board() -> KanbanBoard {
     board.add_task(
         TaskBuilder::new(
             "Add configuration file support",
-            "Implement taim-config crate for loading TOML/YAML configuration files.\n\n\
-             Support:\n\
-             - Default config locations\n\
-             - Environment variable overrides\n\
-             - Command-line argument overrides",
+            "## Objective\n\
+             Implement `taim-config` crate for loading configuration files.\n\n\
+             ## Supported Formats\n\
+             - **TOML** (primary)\n\
+             - YAML (optional)\n\n\
+             ## Configuration Sources\n\
+             Priority order (highest to lowest):\n\
+             1. Command-line arguments\n\
+             2. Environment variables (`TAIM_*`)\n\
+             3. Local config (`./taim.toml`)\n\
+             4. User config (`~/.config/taim/config.toml`)\n\
+             5. Built-in defaults\n\n\
+             ## Sample Config\n\
+             ```toml\n\
+             [session]\n\
+             timeout = 300\n\
+             max_retries = 3\n\
+             ```",
         )
         .state(TaskState::Idle)
         .lane(LaneKind::Backlog)
@@ -133,12 +163,27 @@ pub fn dummy_board() -> KanbanBoard {
     board.add_task(
         TaskBuilder::new(
             "Implement Kanban TUI",
-            "Build the terminal user interface with Ratatui.\n\n\
-             Features:\n\
-             - Four-lane board with task cards\n\
-             - Keyboard navigation\n\
-             - Task detail panel\n\
-             - Responsive layout",
+            "## Status\n\
+             Building terminal UI with **Ratatui** framework.\n\n\
+             ## Features\n\
+             - [x] Four-lane board layout\n\
+             - [x] Task cards with state indicators\n\
+             - [ ] Keyboard navigation (`h/j/k/l`)\n\
+             - [ ] Task detail panel\n\
+             - [ ] Responsive resize handling\n\n\
+             ## Architecture\n\
+             ```\n\
+             App -> Board -> Lanes -> Tasks\n\
+                       |         |\n\
+                       v         v\n\
+                   Header    Cards\n\
+             ```\n\n\
+             ## Key Bindings\n\
+             | Key | Action |\n\
+             |-----|--------|\n\
+             | `q` | Quit |\n\
+             | `j/k` | Navigate |\n\
+             | `Enter` | Select |",
         )
         .state(TaskState::InFlight)
         .lane(LaneKind::InProgress)
@@ -148,9 +193,25 @@ pub fn dummy_board() -> KanbanBoard {
     board.add_task(
         TaskBuilder::new(
             "Fix memory leak in event loop",
-            "Investigate growing memory usage during long sessions.\n\n\
-             Profiler shows unbounded buffer growth in the message channel.\n\
-             Need to add backpressure or bounded channels.",
+            "## Problem\n\
+             Memory usage grows **unbounded** during long sessions.\n\n\
+             ## Symptoms\n\
+             - RSS increases ~1MB/minute\n\
+             - Eventually causes `OOM` on constrained systems\n\
+             - Profiler points to *message channel buffers*\n\n\
+             ## Root Cause\n\
+             Using unbounded channel in event loop:\n\
+             ```rust\n\
+             // Current (problematic)\n\
+             let (tx, rx) = mpsc::unbounded_channel();\n\
+             ```\n\n\
+             ## Proposed Fix\n\
+             Switch to bounded channel with backpressure:\n\
+             ```rust\n\
+             // Fixed\n\
+             let (tx, rx) = mpsc::channel(100);\n\
+             ```\n\n\
+             **Warning**: This may require handling `SendError` when buffer is full.",
         )
         .state(TaskState::NeedsAttention)
         .lane(LaneKind::InProgress)
@@ -161,12 +222,24 @@ pub fn dummy_board() -> KanbanBoard {
     board.add_task(
         TaskBuilder::new(
             "Add Claude Code integration",
-            "Spawn and manage Claude Code subprocess.\n\n\
-             Implementation:\n\
-             - Parse JSON-RPC messages\n\
-             - Handle process lifecycle\n\
-             - Stream stdout/stderr\n\
-             - Graceful shutdown",
+            "## Summary\n\
+             Implement `taim-session` crate to spawn and manage **Claude Code** subprocesses.\n\n\
+             ## Implementation Details\n\
+             ### Message Protocol\n\
+             Uses *JSON-RPC 2.0* over stdio:\n\
+             ```json\n\
+             {\"jsonrpc\": \"2.0\", \"method\": \"init\", \"id\": 1}\n\
+             ```\n\n\
+             ### Process Lifecycle\n\
+             1. Spawn via `tokio::process::Command`\n\
+             2. Pipe `stdin`/`stdout`/`stderr`\n\
+             3. Monitor for unexpected termination\n\
+             4. Graceful shutdown with `SIGTERM`\n\n\
+             ## Review Checklist\n\
+             - [ ] Error handling is comprehensive\n\
+             - [ ] No resource leaks on panic\n\
+             - [ ] Tests cover edge cases\n\
+             - [ ] Documentation complete",
         )
         .state(TaskState::InFlight)
         .lane(LaneKind::UnderReview)
@@ -177,13 +250,23 @@ pub fn dummy_board() -> KanbanBoard {
     board.add_task(
         TaskBuilder::new(
             "Project setup",
-            "Initialize Rust workspace with Cargo.toml and crate structure.\n\n\
-             Created:\n\
-             - taim (root binary)\n\
-             - taim-protocol\n\
-             - taim-tui\n\
-             - taim-session (planned)\n\
-             - taim-config (planned)",
+            "## Completed\n\
+             Initialized Rust workspace with **Cargo.toml** and crate structure.\n\n\
+             ## Workspace Structure\n\
+             ```\n\
+             taim/\n\
+             +-- Cargo.toml          # Workspace root\n\
+             +-- src/main.rs         # CLI binary\n\
+             +-- crates/\n\
+                 +-- taim-protocol/  # Shared types\n\
+                 +-- taim-tui/       # Terminal UI\n\
+                 +-- taim-session/   # Process mgmt\n\
+                 +-- taim-config/    # Configuration\n\
+             ```\n\n\
+             ## Key Decisions\n\
+             - **Edition**: Rust 2024\n\
+             - **Async runtime**: tokio\n\
+             - **Error handling**: `thiserror` + `anyhow`",
         )
         .state(TaskState::Success)
         .lane(LaneKind::Done)
@@ -193,9 +276,19 @@ pub fn dummy_board() -> KanbanBoard {
     board.add_task(
         TaskBuilder::new(
             "Implement REST API",
-            "Add HTTP endpoints for remote control.\n\n\
-             Abandoned in favor of TUI-first approach.\n\
-             May revisit later for headless operation.",
+            "## Status: *Abandoned*\n\n\
+             Originally planned HTTP endpoints for remote control.\n\n\
+             ## Reason\n\
+             Decided to focus on **TUI-first** approach:\n\
+             - Simpler architecture\n\
+             - No network security concerns\n\
+             - Faster iteration\n\n\
+             ## Future Consideration\n\
+             May revisit for **headless operation** mode:\n\
+             ```\n\
+             taim --headless --port 8080\n\
+             ```\n\n\
+             > Note: Would require authentication and TLS support.",
         )
         .state(TaskState::Failed)
         .lane(LaneKind::Done)
