@@ -2,23 +2,23 @@
 source: crates/taim-tui/src/widgets/tests.rs
 expression: buffer_to_string(&buf)
 ---
-┌ Task Details ────────────────────────┐
-│Title: Blocked Task                   │
-│Status: ◆ Needs Attention             │
-│Lane: In Progress                     │
-│                                      │
-│────────────────────────────────────  │
-│                                      │
-│Description:                          │
+╭ Blocked Task ────────────────────────╮
+│◆ Needs Attention  │  Lane: In Progres│
+│Created: 2025-01-15 10:30             │
+│Updated: 2025-01-15 10:30             │
+│──────────────────────────────────────│
 │Waiting for input from the product    │
 │manager.                              │
 │                                      │
-│────────────────────────────────────  │
-│                                      │
-│Created: 2025-01-15 10:30             │
-│Updated: 2025-01-15 10:30             │
-│                                      │
-│[Esc] Close                           │
 │                                      │
 │                                      │
-└──────────────────────────────────────┘
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│──────────────────────────────────────│
+│[Esc] Back to board  [↑↓] Scroll      │
+╰──────────────────────────────────────╯

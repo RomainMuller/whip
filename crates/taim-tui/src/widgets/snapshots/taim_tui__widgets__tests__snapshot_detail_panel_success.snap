@@ -2,23 +2,23 @@
 source: crates/taim-tui/src/widgets/tests.rs
 expression: buffer_to_string(&buf)
 ---
-┌ Task Details ────────────────────────┐
-│Title: Completed Task                 │
-│Status: ✓ Success                     │
-│Lane: Done                            │
-│                                      │
-│────────────────────────────────────  │
-│                                      │
-│Description:                          │
-│Successfully finished and deployed.   │
-│                                      │
-│────────────────────────────────────  │
-│                                      │
+╭ Completed Task ──────────────────────╮
+│✓ Success  │  Lane: Done              │
 │Created: 2025-01-15 10:30             │
 │Updated: 2025-01-15 10:30             │
+│──────────────────────────────────────│
+│Successfully finished and deployed.   │
 │                                      │
-│[Esc] Close                           │
 │                                      │
 │                                      │
 │                                      │
-└──────────────────────────────────────┘
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│──────────────────────────────────────│
+│[Esc] Back to board  [↑↓] Scroll      │
+╰──────────────────────────────────────╯

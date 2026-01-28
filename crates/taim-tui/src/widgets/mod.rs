@@ -56,7 +56,7 @@ pub mod task_card;
 pub use board::render_board;
 pub use detail::{render_detail_panel, state_indicator};
 pub use help::render_help_overlay;
-pub use lane::render_lane;
+pub use lane::{render_lane, LanePosition};
 pub use status_bar::render_status_bar;
 pub use task_card::{render_task_card, state_color};
 

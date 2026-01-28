@@ -2,23 +2,23 @@
 source: crates/taim-tui/src/widgets/tests.rs
 expression: buffer_to_string(&buf)
 ---
-┌ Task Details ────────────────────────┐
-│Title: Active Task                    │
-│Status: ● In Progress                 │
-│Lane: In Progress                     │
-│                                      │
-│────────────────────────────────────  │
-│                                      │
-│Description:                          │
-│Work in progress on this feature.     │
-│                                      │
-│────────────────────────────────────  │
-│                                      │
+╭ Active Task ─────────────────────────╮
+│● In Progress  │  Lane: In Progress   │
 │Created: 2025-01-15 10:30             │
 │Updated: 2025-01-15 10:30             │
+│──────────────────────────────────────│
+│Work in progress on this feature.     │
 │                                      │
-│[Esc] Close                           │
 │                                      │
 │                                      │
 │                                      │
-└──────────────────────────────────────┘
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│──────────────────────────────────────│
+│[Esc] Back to board  [↑↓] Scroll      │
+╰──────────────────────────────────────╯

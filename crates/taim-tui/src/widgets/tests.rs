@@ -18,7 +18,7 @@ fn test_task(title: &str, description: &str) -> Task {
 
 use super::{
     render_board, render_detail_panel, render_help_overlay, render_lane, render_status_bar,
-    render_task_card,
+    render_task_card, LanePosition,
 };
 
 /// Converts a buffer to a string representation for snapshot testing.
@@ -116,7 +116,7 @@ fn snapshot_lane_empty() {
     let area = Rect::new(0, 0, 25, 15);
     let mut buf = Buffer::empty(area);
 
-    render_lane(&lane, false, None, area, &mut buf);
+    render_lane(&lane, false, None, area, &mut buf, LanePosition::First, false);
 
     insta::assert_snapshot!(buffer_to_string(&buf));
 }
@@ -136,7 +136,7 @@ fn snapshot_lane_with_tasks() {
     let area = Rect::new(0, 0, 25, 15);
     let mut buf = Buffer::empty(area);
 
-    render_lane(&lane, true, Some(0), area, &mut buf);
+    render_lane(&lane, true, Some(0), area, &mut buf, LanePosition::Middle, false);
 
     insta::assert_snapshot!(buffer_to_string(&buf));
 }
@@ -341,6 +341,39 @@ fn snapshot_detail_panel_empty_description() {
     task.state = TaskState::Idle;
 
     let area = Rect::new(0, 0, 40, 20);
+    let mut buf = Buffer::empty(area);
+
+    render_detail_panel(&task, 0, area, &mut buf);
+
+    insta::assert_snapshot!(buffer_to_string(&buf));
+}
+
+#[test]
+fn snapshot_detail_panel_medium_width() {
+    // Test the 2-row metadata layout with aligned delimiters
+    let mut task = test_task("Medium Width Task", "Testing the medium width layout.");
+    task.state = TaskState::InFlight;
+    task.lane = LaneKind::InProgress;
+
+    // Width of 80 should trigger 2-row layout (status+lane on row 1, timestamps on row 2)
+    // The aligned timestamps line needs ~75 chars (padding + separators + content)
+    let area = Rect::new(0, 0, 80, 20);
+    let mut buf = Buffer::empty(area);
+
+    render_detail_panel(&task, 0, area, &mut buf);
+
+    insta::assert_snapshot!(buffer_to_string(&buf));
+}
+
+#[test]
+fn snapshot_detail_panel_wide() {
+    // Test the 1-row metadata layout (everything on one line)
+    let mut task = test_task("Wide Screen Task", "Testing the wide layout.");
+    task.state = TaskState::Success;
+    task.lane = LaneKind::Done;
+
+    // Width of 100 should fit everything on one line
+    let area = Rect::new(0, 0, 100, 20);
     let mut buf = Buffer::empty(area);
 
     render_detail_panel(&task, 0, area, &mut buf);
