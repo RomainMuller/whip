@@ -3,7 +3,6 @@
 //! This module provides the `App` struct which orchestrates the TUI
 //! application lifecycle including event handling, state updates, and rendering.
 
-use crossterm::event::Event;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -17,10 +16,16 @@ use taim_protocol::{KanbanBoard, Message};
 
 use crate::{
     AppState, Focus,
-    event::{key_to_message, poll_event},
+    event::{event_to_message, poll_event},
     terminal::AppTerminal,
     widgets::{render_board, render_detail_panel, render_help_overlay},
 };
+
+/// Height of the header bar in rows.
+const HEADER_HEIGHT: u16 = 3;
+
+/// Height of each task card in rows (must match lane.rs).
+const TASK_CARD_HEIGHT: u16 = 4;
 
 /// The main application struct.
 ///
@@ -29,6 +34,8 @@ use crate::{
 pub struct App {
     state: AppState,
     should_quit: bool,
+    /// Last known terminal area, used for click hit-testing.
+    last_area: Rect,
 }
 
 impl App {
@@ -52,6 +59,7 @@ impl App {
         Self {
             state: AppState::new(board),
             should_quit: false,
+            last_area: Rect::default(),
         }
     }
 
@@ -142,6 +150,55 @@ impl App {
             Message::Refresh => {
                 // TODO: Implement refresh action
             }
+            Message::ClickAt { column, row } => {
+                self.handle_click(column, row);
+            }
+        }
+    }
+
+    /// Handles a mouse click at the given coordinates.
+    ///
+    /// If the click is on a task card, selects that task and opens the detail view.
+    fn handle_click(&mut self, column: u16, row: u16) {
+        // Only handle clicks when on the board view
+        if self.state.focus != Focus::Board || self.state.detail_visible {
+            return;
+        }
+
+        // Compute the board area (content area below header)
+        let board_area = Rect {
+            x: self.last_area.x,
+            y: self.last_area.y + HEADER_HEIGHT,
+            width: self.last_area.width,
+            height: self.last_area.height.saturating_sub(HEADER_HEIGHT),
+        };
+
+        // Check if click is within board area
+        if !board_area.contains((column, row).into()) {
+            return;
+        }
+
+        // Compute which lane was clicked (4 equal columns)
+        let lane_width = board_area.width / 4;
+        if lane_width == 0 {
+            return;
+        }
+        let relative_x = column.saturating_sub(board_area.x);
+        let lane_idx = (relative_x / lane_width).min(3) as usize;
+
+        // Compute which task was clicked within the lane
+        // Account for the lane border (1 row for top border)
+        let relative_y = row.saturating_sub(board_area.y + 1);
+        let task_idx = (relative_y / TASK_CARD_HEIGHT) as usize;
+
+        // Validate the task exists in the clicked lane
+        let lane = &self.state.board.lanes[lane_idx];
+        if task_idx < lane.len() {
+            // Select the lane and task
+            self.state.selected_lane = lane_idx;
+            self.state.selected_task = Some(task_idx);
+            // Open detail view
+            self.state.toggle_detail();
         }
     }
 
@@ -150,8 +207,9 @@ impl App {
     /// # Arguments
     ///
     /// * `frame` - The frame to render into.
-    pub fn view(&self, frame: &mut Frame) {
+    pub fn view(&mut self, frame: &mut Frame) {
         let area = frame.area();
+        self.last_area = area;
 
         // Create main layout (header + content, no footer)
         let chunks = Layout::default()
@@ -210,9 +268,9 @@ impl App {
             // Render
             terminal.draw(|frame| self.view(frame))?;
 
-            // Poll for events
-            if let Some(Event::Key(key)) = poll_event()?
-                && let Some(msg) = key_to_message(key)
+            // Poll for events (keyboard and mouse)
+            if let Some(event) = poll_event()?
+                && let Some(msg) = event_to_message(&event)
             {
                 self.update(msg);
             }
@@ -447,5 +505,87 @@ mod tests {
         app.update(Message::Escape);
         assert!(!app.state.help_visible);
         assert!(!app.should_quit); // Should NOT quit
+    }
+
+    #[test]
+    fn app_click_on_task_selects_and_opens_detail() {
+        let mut board = KanbanBoard::new();
+        board.add_task(taim_protocol::Task::new("Task 1", "Description"));
+
+        let mut app = App::new(board);
+        // Simulate having rendered with a known area
+        app.last_area = Rect::new(0, 0, 80, 24);
+
+        // Click on the first task in the first lane
+        // Board starts at row 3 (header height), lane border is row 3, task is row 4+
+        // Lane 0 is columns 0-19 (80/4 = 20 width per lane)
+        app.update(Message::ClickAt { column: 5, row: 4 });
+
+        assert_eq!(app.state.selected_lane, 0);
+        assert_eq!(app.state.selected_task, Some(0));
+        assert!(app.state.detail_visible);
+    }
+
+    #[test]
+    fn app_click_on_different_lane_selects_correct_lane() {
+        let mut board = KanbanBoard::new();
+        board.add_task(taim_protocol::Task::new("Task 1", "Description"));
+        // Move task to lane 2 (Under Review)
+        board.move_task(board.lanes[0].tasks[0].id, taim_protocol::LaneKind::UnderReview);
+
+        let mut app = App::new(board);
+        app.last_area = Rect::new(0, 0, 80, 24);
+
+        // Click on lane 2 (columns 40-59 for 80-wide terminal)
+        app.update(Message::ClickAt { column: 45, row: 4 });
+
+        assert_eq!(app.state.selected_lane, 2);
+        assert_eq!(app.state.selected_task, Some(0));
+        assert!(app.state.detail_visible);
+    }
+
+    #[test]
+    fn app_click_on_empty_lane_does_nothing() {
+        let board = KanbanBoard::new();
+        let mut app = App::new(board);
+        app.last_area = Rect::new(0, 0, 80, 24);
+
+        app.update(Message::ClickAt { column: 5, row: 4 });
+
+        assert!(!app.state.detail_visible);
+    }
+
+    #[test]
+    fn app_click_outside_board_does_nothing() {
+        let mut board = KanbanBoard::new();
+        board.add_task(taim_protocol::Task::new("Task 1", "Description"));
+
+        let mut app = App::new(board);
+        app.last_area = Rect::new(0, 0, 80, 24);
+
+        // Click on header (row 0-2)
+        app.update(Message::ClickAt { column: 5, row: 1 });
+
+        assert!(!app.state.detail_visible);
+    }
+
+    #[test]
+    fn app_click_ignored_when_detail_visible() {
+        let mut board = KanbanBoard::new();
+        board.add_task(taim_protocol::Task::new("Task 1", "Description"));
+        board.add_task(taim_protocol::Task::new("Task 2", "Description"));
+
+        let mut app = App::new(board);
+        app.last_area = Rect::new(0, 0, 80, 24);
+
+        // Open detail on first task
+        app.update(Message::NavigateDown);
+        app.update(Message::Select);
+        assert!(app.state.detail_visible);
+        assert_eq!(app.state.selected_task, Some(0));
+
+        // Try clicking on second task - should be ignored
+        app.update(Message::ClickAt { column: 5, row: 8 });
+        assert_eq!(app.state.selected_task, Some(0)); // Still first task
     }
 }

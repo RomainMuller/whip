@@ -7,6 +7,7 @@
 use std::io::{self, Stdout};
 
 use crossterm::{
+    event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -50,7 +51,7 @@ pub enum TerminalError {
 pub fn setup_terminal() -> Result<AppTerminal, TerminalError> {
     enable_raw_mode().map_err(TerminalError::Setup)?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen).map_err(TerminalError::Setup)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture).map_err(TerminalError::Setup)?;
     let backend = CrosstermBackend::new(stdout);
     Terminal::new(backend).map_err(TerminalError::Setup)
 }
@@ -77,7 +78,8 @@ pub fn setup_terminal() -> Result<AppTerminal, TerminalError> {
 /// ```
 pub fn restore_terminal(terminal: &mut AppTerminal) -> Result<(), TerminalError> {
     disable_raw_mode().map_err(TerminalError::Restore)?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen).map_err(TerminalError::Restore)?;
+    execute!(terminal.backend_mut(), DisableMouseCapture, LeaveAlternateScreen)
+        .map_err(TerminalError::Restore)?;
     terminal.show_cursor().map_err(TerminalError::Restore)?;
     Ok(())
 }
@@ -104,7 +106,7 @@ pub fn install_panic_hook() {
     std::panic::set_hook(Box::new(move |panic_info| {
         // Best-effort terminal restoration
         let _ = disable_raw_mode();
-        let _ = execute!(io::stdout(), LeaveAlternateScreen);
+        let _ = execute!(io::stdout(), DisableMouseCapture, LeaveAlternateScreen);
         original_hook(panic_info);
     }));
 }
