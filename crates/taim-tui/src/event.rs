@@ -5,7 +5,7 @@
 
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
 use taim_protocol::Message;
 
 /// Default poll timeout for events.
@@ -24,6 +24,34 @@ pub fn poll_event() -> std::io::Result<Option<Event>> {
         Ok(Some(event::read()?))
     } else {
         Ok(None)
+    }
+}
+
+/// Converts an event (keyboard or mouse) to an application message.
+///
+/// Returns `Some(Message)` if the event maps to an action,
+/// or `None` if the event is not handled.
+#[must_use]
+pub fn event_to_message(event: &Event) -> Option<Message> {
+    match event {
+        Event::Key(key) => key_to_message(*key),
+        Event::Mouse(mouse) => mouse_to_message(mouse),
+        _ => None,
+    }
+}
+
+/// Converts a mouse event to an application message.
+///
+/// Only left-click press events are handled, producing a `ClickAt` message
+/// with the click coordinates.
+#[must_use]
+fn mouse_to_message(mouse: &crossterm::event::MouseEvent) -> Option<Message> {
+    match mouse.kind {
+        MouseEventKind::Down(MouseButton::Left) => Some(Message::ClickAt {
+            column: mouse.column,
+            row: mouse.row,
+        }),
+        _ => None,
     }
 }
 
@@ -79,7 +107,7 @@ pub fn key_to_message(key: KeyEvent) -> Option<Message> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crossterm::event::KeyEventKind;
+    use crossterm::event::{KeyEventKind, MouseEvent, MouseEventKind};
 
     fn make_key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
@@ -91,6 +119,15 @@ mod tests {
             modifiers,
             kind: KeyEventKind::Press,
             state: event::KeyEventState::NONE,
+        }
+    }
+
+    fn make_mouse_click(column: u16, row: u16) -> MouseEvent {
+        MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
         }
     }
 
@@ -177,5 +214,68 @@ mod tests {
     fn unmapped_keys_return_none() {
         assert_eq!(key_to_message(make_key(KeyCode::Char('x'))), None);
         assert_eq!(key_to_message(make_key(KeyCode::F(1))), None);
+    }
+
+    #[test]
+    fn mouse_left_click_generates_click_at() {
+        let mouse = make_mouse_click(10, 5);
+        assert_eq!(
+            mouse_to_message(&mouse),
+            Some(Message::ClickAt { column: 10, row: 5 })
+        );
+    }
+
+    #[test]
+    fn mouse_right_click_ignored() {
+        let mouse = MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Right),
+            column: 10,
+            row: 5,
+            modifiers: KeyModifiers::NONE,
+        };
+        assert_eq!(mouse_to_message(&mouse), None);
+    }
+
+    #[test]
+    fn mouse_release_ignored() {
+        let mouse = MouseEvent {
+            kind: MouseEventKind::Up(MouseButton::Left),
+            column: 10,
+            row: 5,
+            modifiers: KeyModifiers::NONE,
+        };
+        assert_eq!(mouse_to_message(&mouse), None);
+    }
+
+    #[test]
+    fn mouse_move_ignored() {
+        let mouse = MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: 10,
+            row: 5,
+            modifiers: KeyModifiers::NONE,
+        };
+        assert_eq!(mouse_to_message(&mouse), None);
+    }
+
+    #[test]
+    fn event_to_message_handles_key_events() {
+        let key_event = Event::Key(make_key(KeyCode::Enter));
+        assert_eq!(event_to_message(&key_event), Some(Message::Select));
+    }
+
+    #[test]
+    fn event_to_message_handles_mouse_events() {
+        let mouse_event = Event::Mouse(make_mouse_click(15, 8));
+        assert_eq!(
+            event_to_message(&mouse_event),
+            Some(Message::ClickAt { column: 15, row: 8 })
+        );
+    }
+
+    #[test]
+    fn event_to_message_ignores_resize_events() {
+        let resize_event = Event::Resize(80, 24);
+        assert_eq!(event_to_message(&resize_event), None);
     }
 }

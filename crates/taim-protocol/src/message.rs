@@ -41,6 +41,13 @@ pub enum Message {
     Refresh,
     /// Toggle help overlay.
     ToggleHelp,
+    /// Mouse click at coordinates (column, row).
+    ClickAt {
+        /// Column (x coordinate) of the click.
+        column: u16,
+        /// Row (y coordinate) of the click.
+        row: u16,
+    },
 }
 
 impl Message {
@@ -115,6 +122,7 @@ mod tests {
             Message::Quit,
             Message::Refresh,
             Message::ToggleHelp,
+            Message::ClickAt { column: 10, row: 5 },
         ];
 
         for msg in messages {
