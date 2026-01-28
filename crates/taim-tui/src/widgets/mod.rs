@@ -49,6 +49,7 @@ pub mod board;
 pub mod detail;
 pub mod help;
 pub mod lane;
+pub mod markdown;
 pub mod status_bar;
 pub mod task_card;
 

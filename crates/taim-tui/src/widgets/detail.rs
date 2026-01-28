@@ -13,6 +13,7 @@ use ratatui::{
 };
 use taim_protocol::{Task, TaskState};
 
+use super::markdown::render_markdown;
 use super::task_card::state_color;
 
 /// Returns the status indicator symbol and color for a task state.
@@ -301,29 +302,22 @@ fn render_separator(area: Rect, buf: &mut Buffer) {
     sep.render(area, buf);
 }
 
-/// Renders the description section with scrolling support.
+/// Renders the description section with scrolling support and markdown formatting.
 fn render_description(task: &Task, scroll_offset: u16, area: Rect, buf: &mut Buffer) {
-    // Calculate readable width (max 80 chars for readability, or full width if smaller)
+    // Calculate readable width (max 100 chars for readability, or full width if smaller)
     let content_width = area.width.min(100) as usize;
 
-    let mut lines: Vec<Line<'static>> = Vec::new();
-
-    if task.description.is_empty() {
-        lines.push(Line::from(Span::styled(
+    let mut lines: Vec<Line<'static>> = if task.description.is_empty() {
+        vec![Line::from(Span::styled(
             "No description",
             Style::default()
                 .fg(Color::DarkGray)
                 .add_modifier(Modifier::ITALIC),
-        )));
+        ))]
     } else {
-        // Wrap description text to readable width
-        for line in wrap_text(&task.description, content_width) {
-            lines.push(Line::from(Span::styled(
-                line,
-                Style::default().fg(Color::White),
-            )));
-        }
-    }
+        // Render description as markdown
+        render_markdown(&task.description, content_width)
+    };
 
     // Apply scroll offset
     let scroll = scroll_offset as usize;
@@ -350,28 +344,22 @@ fn render_footer(area: Rect, buf: &mut Buffer) {
 
 /// Builds the description lines for scroll calculation.
 ///
-/// This returns just the description lines (for scroll offset calculation).
+/// This returns just the description lines (for scroll offset calculation),
+/// using markdown rendering to match the actual display.
 fn build_description_lines(task: &Task, width: u16) -> Vec<Line<'static>> {
     let content_width = width.min(100) as usize;
-    let mut lines = Vec::new();
 
     if task.description.is_empty() {
-        lines.push(Line::from(Span::styled(
+        vec![Line::from(Span::styled(
             "No description",
             Style::default()
                 .fg(Color::DarkGray)
                 .add_modifier(Modifier::ITALIC),
-        )));
+        ))]
     } else {
-        for line in wrap_text(&task.description, content_width) {
-            lines.push(Line::from(Span::styled(
-                line,
-                Style::default().fg(Color::White),
-            )));
-        }
+        // Use markdown renderer for consistent line count
+        render_markdown(&task.description, content_width)
     }
-
-    lines
 }
 
 /// Builds the content lines for the detail panel (used by tests).
