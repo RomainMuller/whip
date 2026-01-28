@@ -8,7 +8,7 @@ use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, Widget},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget},
 };
 
 /// The width of the help overlay panel.
@@ -74,11 +74,12 @@ pub fn render_help_overlay(area: Rect, buf: &mut Buffer) {
         .title(Span::styled(
             " Help ",
             Style::default()
-                .fg(Color::Cyan)
+                .fg(Color::LightYellow)
                 .add_modifier(Modifier::BOLD),
         ))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::LightYellow));
 
     let help_text = Paragraph::new(lines)
         .block(help_block)

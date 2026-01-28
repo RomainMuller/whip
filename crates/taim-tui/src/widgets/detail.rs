@@ -173,23 +173,23 @@ fn calculate_metadata_height(task: &Task, width: u16) -> u16 {
     let updated_fmt = task.updated_at.format("%Y-%m-%d %H:%M").to_string();
 
     // Calculate lengths of each segment (including separators)
-    // Status: "● In Progress" = indicator(1) + space(1) + state_name
-    let status_len = 2 + state_name.len();
-    // Lane: "  │  Lane: Backlog" ~= 5 + 6 + lane_name.len()
-    let lane_len = 11 + lane_name.len();
+    // Lane: "Lane: Backlog" = 6 + lane_name.len()
+    let lane_len = 6 + lane_name.len();
+    // Status: "  │  ● In Progress" ~= 5 + indicator(1) + space(1) + state_name
+    let status_len = 7 + state_name.len();
     // Created: "  │  Created: 2025-01-28 10:30" ~= 5 + 9 + 16
     let created_len = 5 + 9 + created_fmt.len();
     // Updated: "  │  Updated: 2025-01-28 10:30" ~= 5 + 9 + 16
     let updated_len = 5 + 9 + updated_fmt.len();
 
-    let full_line = status_len + lane_len + created_len + updated_len;
-    let first_line = status_len + lane_len;
-    // Second line in 2-row mode: "Created: timestamp" padded to status_len+2, then "│  Updated: timestamp"
-    // status_len + 2 (for "  ") = column where │ appears
+    let full_line = lane_len + status_len + created_len + updated_len;
+    let first_line = lane_len + status_len;
+    // Second line in 2-row mode: "Created: timestamp" padded to lane_len+2, then "│  Updated: timestamp"
+    // lane_len + 2 (for "  ") = column where │ appears
     // Then: "│  " (3) + "Updated: " (9) + timestamp
-    let status_section_len = status_len + 2; // includes the "  " before │
+    let lane_section_len = lane_len + 2; // includes the "  " before │
     let created_with_label = 9 + created_fmt.len(); // "Created: " + timestamp
-    let left_col = status_section_len.max(created_with_label);
+    let left_col = lane_section_len.max(created_with_label);
     let timestamps_line = left_col + 3 + 9 + updated_fmt.len(); // left_col + "│  " + "Updated: " + timestamp
 
     let w = width as usize;
@@ -197,7 +197,7 @@ fn calculate_metadata_height(task: &Task, width: u16) -> u16 {
     if full_line <= w {
         1 // Everything fits on one line
     } else if first_line <= w && timestamps_line <= w {
-        2 // Status+Lane on first line, timestamps on second (aligned)
+        2 // Lane+Status on first line, timestamps on second (aligned)
     } else {
         3 // Each major group on its own line
     }
@@ -215,14 +215,14 @@ fn render_metadata(task: &Task, area: Rect, buf: &mut Buffer) {
     let lines: Vec<Line<'static>> = if height == 1 {
         // Everything on one line
         vec![Line::from(vec![
-            Span::styled(format!("{indicator} "), Style::default().fg(indicator_color)),
-            Span::styled(state_name, Style::default().fg(state_color(task.state))),
-            Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
             Span::styled("Lane: ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 task.lane.display_name().to_string(),
                 Style::default().fg(Color::White),
             ),
+            Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{indicator} "), Style::default().fg(indicator_color)),
+            Span::styled(state_name, Style::default().fg(state_color(task.state))),
             Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
             Span::styled("Created: ", Style::default().fg(Color::DarkGray)),
             Span::styled(created_fmt, Style::default().fg(Color::White)),
@@ -231,29 +231,26 @@ fn render_metadata(task: &Task, area: Rect, buf: &mut Buffer) {
             Span::styled(updated_fmt, Style::default().fg(Color::White)),
         ])]
     } else if height == 2 {
-        // Status+Lane on first line, timestamps on second
+        // Lane+Status on first line, timestamps on second
         // Align the │ delimiter: both lines have same column width before │
-        // First line:  "● In Progress     │  Lane: In Progress"
+        // First line:  "Lane: In Progress │  ● In Progress"
         // Second line: "Created: 10:30    │  Updated: 10:30"
 
-        // Calculate column width: max of status section and created section
-        let status_section = format!("{indicator} {state_name}");
+        // Calculate column width: max of lane section and created section
+        let lane_section = format!("Lane: {}", task.lane.display_name());
         let created_section = format!("Created: {created_fmt}");
-        let col_width = status_section.len().max(created_section.len());
+        let col_width = lane_section.len().max(created_section.len());
 
         vec![
             Line::from(vec![
-                Span::styled(format!("{indicator} "), Style::default().fg(indicator_color)),
-                Span::styled(
-                    format!("{state_name:width$}", width = col_width - 2), // -2 for "● "
-                    Style::default().fg(state_color(task.state)),
-                ),
-                Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
                 Span::styled("Lane: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
-                    task.lane.display_name().to_string(),
+                    format!("{:width$}", task.lane.display_name(), width = col_width - 6), // -6 for "Lane: "
                     Style::default().fg(Color::White),
                 ),
+                Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("{indicator} "), Style::default().fg(indicator_color)),
+                Span::styled(state_name, Style::default().fg(state_color(task.state))),
             ]),
             Line::from(vec![
                 Span::styled("Created: ", Style::default().fg(Color::DarkGray)),
@@ -270,14 +267,14 @@ fn render_metadata(task: &Task, area: Rect, buf: &mut Buffer) {
         // Each group on its own line
         vec![
             Line::from(vec![
-                Span::styled(format!("{indicator} "), Style::default().fg(indicator_color)),
-                Span::styled(state_name, Style::default().fg(state_color(task.state))),
-                Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
                 Span::styled("Lane: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(
                     task.lane.display_name().to_string(),
                     Style::default().fg(Color::White),
                 ),
+                Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("{indicator} "), Style::default().fg(indicator_color)),
+                Span::styled(state_name, Style::default().fg(state_color(task.state))),
             ]),
             Line::from(vec![
                 Span::styled("Created: ", Style::default().fg(Color::DarkGray)),

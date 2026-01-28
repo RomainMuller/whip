@@ -3,7 +3,7 @@ source: crates/taim-tui/src/widgets/tests.rs
 expression: buffer_to_string(&buf)
 ---
 ╭ Blocked Task ────────────────────────╮
-│◆ Needs Attention  │  Lane: In Progres│
+│Lane: In Progress  │  ◆ Needs Attentio│
 │Created: 2025-01-15 10:30             │
 │Updated: 2025-01-15 10:30             │
 │──────────────────────────────────────│

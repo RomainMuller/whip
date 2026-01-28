@@ -1,8 +1,9 @@
 ---
 source: crates/taim-tui/src/widgets/tests.rs
+assertion_line: 401
 expression: buffer_to_string(&buf)
 ---
-  ┌ Help ───────────────────────────┐
+  ╭ Help ───────────────────────────╮
   │                                 │
   │  Navigation                     │
   │  ←          Move left           │
@@ -16,4 +17,4 @@ expression: buffer_to_string(&buf)
   │  Ctrl+C     Quit                │
   │  ?          Toggle help         │
   │                                 │
-  └─────────────────────────────────┘
+  ╰─────────────────────────────────╯
