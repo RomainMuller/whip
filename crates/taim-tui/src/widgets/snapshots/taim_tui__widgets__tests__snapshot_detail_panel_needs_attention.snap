@@ -1,0 +1,24 @@
+---
+source: crates/taim-tui/src/widgets/tests.rs
+expression: buffer_to_string(&buf)
+---
+┌ Task Details ────────────────────────┐
+│Title: Blocked Task                   │
+│Status: ◆ Needs Attention             │
+│Lane: In Progress                     │
+│                                      │
+│────────────────────────────────────  │
+│                                      │
+│Description:                          │
+│Waiting for input from the product    │
+│manager.                              │
+│                                      │
+│────────────────────────────────────  │
+│                                      │
+│Created: 2026-01-28 14:16             │
+│Updated: 2026-01-28 14:16             │
+│                                      │
+│[Esc] Close                           │
+│                                      │
+│                                      │
+└──────────────────────────────────────┘

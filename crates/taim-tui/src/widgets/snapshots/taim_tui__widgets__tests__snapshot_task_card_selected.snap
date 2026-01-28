@@ -1,0 +1,9 @@
+---
+source: crates/taim-tui/src/widgets/tests.rs
+assertion_line: 205
+expression: buffer_to_string(&buf)
+---
+┌────────────────────┐
+│Selected Task       │
+│This task is sele...│
+└────────────────────┘

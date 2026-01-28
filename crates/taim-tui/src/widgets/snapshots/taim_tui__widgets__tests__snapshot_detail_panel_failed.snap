@@ -1,0 +1,24 @@
+---
+source: crates/taim-tui/src/widgets/tests.rs
+expression: buffer_to_string(&buf)
+---
+┌ Task Details ────────────────────────┐
+│Title: Failed Task                    │
+│Status: ✗ Failed                      │
+│Lane: Done                            │
+│                                      │
+│────────────────────────────────────  │
+│                                      │
+│Description:                          │
+│Error occurred during execution.      │
+│                                      │
+│────────────────────────────────────  │
+│                                      │
+│Created: 2026-01-28 14:16             │
+│Updated: 2026-01-28 14:16             │
+│                                      │
+│[Esc] Close                           │
+│                                      │
+│                                      │
+│                                      │
+└──────────────────────────────────────┘

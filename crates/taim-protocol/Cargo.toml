@@ -1,0 +1,17 @@
+[package]
+name = "taim-protocol"
+version = "0.0.1-dev"
+description = "Shared types and contracts for taim - task, board, and message types"
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
