@@ -79,7 +79,7 @@ Pin to minor version minimum (e.g., `"1.40"` not `"1"`).
 ### Documentation
 
 - Markdown files use **GFM** (GitHub Flavored Markdown)
-- Use **Mermaid** fenced code blocks for diagrams (` ```mermaid `)
+- Use **Mermaid** fenced code blocks for diagrams (`` ```mermaid ``)
 - Prefer Mermaid over ASCII art when a clear diagram exists
 
 ## Local AI State
