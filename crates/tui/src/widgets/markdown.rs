@@ -1398,9 +1398,11 @@ Check [this link](http://test.com).
             }
         }
 
-        let mut table = TableAccumulator::default();
-        table.headers = vec![cell("A"), cell("BB")];
-        table.rows = vec![vec![cell("1"), cell("22")]];
+        let table = TableAccumulator {
+            headers: vec![cell("A"), cell("BB")],
+            rows: vec![vec![cell("1"), cell("22")]],
+            ..Default::default()
+        };
 
         // Column widths: [1, 2]
         // Box width: 1 + (1+3) + (2+3) = 1 + 4 + 5 = 10

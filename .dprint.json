@@ -8,7 +8,7 @@
     "https://plugins.dprint.dev/toml-0.6.4.wasm"
   ],
   "markdown": {
-    "lineWidth": 120,
+    "lineWidth": 100,
     "textWrap": "always"
   },
   "toml": {
