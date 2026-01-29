@@ -14,6 +14,19 @@ cargo fmt --check                # Format check
 cargo insta review               # Update snapshots
 ```
 
+## Key Documents
+
+Two documents track project state and must be consulted/updated as appropriate:
+
+- **[ARCHITECTURE.md](../../ARCHITECTURE.md)**: Detailed architecture documentation including crate
+  responsibilities, data flow diagrams, key abstractions, and extension points. **Consult this when
+  exploring the codebase.** Update when making architectural changes (new crates, modified data
+  flow, new abstractions).
+
+- **[TODO.md](../../TODO.md)**: Project-level task tracking for code quality findings, technical
+  debt, and future work items. **Update with any issues discovered during work**, categorized by
+  priority (high/medium/low).
+
 ## Architecture
 
 ```
@@ -81,6 +94,38 @@ Pin to minor version minimum (e.g., `"1.40"` not `"1"`).
 - Markdown files use **GFM** (GitHub Flavored Markdown)
 - Use **Mermaid** fenced code blocks for diagrams (`` ```mermaid ``)
 - Prefer Mermaid over ASCII art when a clear diagram exists
+
+## Commit Practices
+
+This project follows [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/)
+practices.
+
+A commit (or changeset) should contain only exactly one change, well identified, that can be
+reviewed independently, and reverted independently. Proper separation of concerns is key here.
+
+### CRITICAL: Create New Changeset BEFORE Making Edits
+
+**When using `jj`, you MUST create a new empty changeset BEFORE making any file edits:**
+
+```bash
+# ALWAYS do this FIRST, before touching any files:
+jj new -m "wip(claude): <brief intention>"
+
+# Only THEN start editing files
+```
+
+This is non-negotiable. Editing files without first creating a new changeset pollutes unrelated
+changesets and violates separation of concerns.
+
+### Sub-Agent Commits
+
+When implementation is delegated to sub-agents, each sub-agent should produce its own commit(s) with
+appropriate description(s) and proper separation of concern. Sub-agents' work is rolled into the
+main workspace by bringing these changesets as ancestors of the current working copy.
+
+Merge commits are welcome to bring multiple independent changes together in the main trunk; the
+merge commit's description should explain the broader composite feature achieved by combining the
+smaller features.
 
 ## Local AI State
 
