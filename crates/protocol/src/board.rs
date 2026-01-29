@@ -177,6 +177,10 @@ pub struct Lane {
 impl Lane {
     /// Creates a new empty lane of the specified kind.
     ///
+    /// This function is `const` despite returning a `Vec`. In Rust 2024 edition,
+    /// [`Vec::new()`] is a const function that performs no heap allocation until
+    /// elements are added, making this safe for use in const contexts.
+    ///
     /// # Examples
     ///
     /// ```
@@ -185,6 +189,15 @@ impl Lane {
     /// let lane = Lane::new(LaneKind::InProgress);
     /// assert_eq!(lane.kind, LaneKind::InProgress);
     /// assert!(lane.tasks.is_empty());
+    /// ```
+    ///
+    /// # Const Usage
+    ///
+    /// ```
+    /// use whip_protocol::{Lane, LaneKind};
+    ///
+    /// const EMPTY_BACKLOG: Lane = Lane::new(LaneKind::Backlog);
+    /// assert!(EMPTY_BACKLOG.tasks.is_empty());
     /// ```
     #[must_use]
     pub const fn new(kind: LaneKind) -> Self {

@@ -6,6 +6,8 @@ use chrono::{TimeZone, Utc};
 use ratatui::{buffer::Buffer, layout::Rect};
 use whip_protocol::{KanbanBoard, LaneKind, Task, TaskState};
 
+use crate::test_utils::buffer_to_string;
+
 /// Creates a test task with fixed timestamps for reproducible snapshots.
 fn test_task(title: &str, description: &str) -> Task {
     let mut task = Task::new(title, description);
@@ -20,23 +22,6 @@ use super::{
     LanePosition, render_board, render_detail_panel, render_help_overlay, render_lane,
     render_status_bar, render_task_card,
 };
-
-/// Converts a buffer to a string representation for snapshot testing.
-fn buffer_to_string(buf: &Buffer) -> String {
-    let mut result = String::new();
-    for y in 0..buf.area.height {
-        for x in 0..buf.area.width {
-            if let Some(cell) = buf.cell((x, y)) {
-                result.push_str(cell.symbol());
-            }
-        }
-        // Trim trailing whitespace from each line for cleaner snapshots
-        let trimmed = result.trim_end_matches(' ');
-        result.truncate(trimmed.len());
-        result.push('\n');
-    }
-    result
-}
 
 /// Creates a sample board with tasks in various states for testing.
 fn create_sample_board() -> KanbanBoard {

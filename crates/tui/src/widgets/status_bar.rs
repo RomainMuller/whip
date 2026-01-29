@@ -104,6 +104,7 @@ pub fn render_status_bar_with_message(message: &str, area: Rect, buf: &mut Buffe
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::buffer_to_string;
 
     #[test]
     fn render_status_bar_contains_hints() {
@@ -126,19 +127,5 @@ mod tests {
 
         let content = buffer_to_string(&buf);
         assert!(content.contains("Test message"));
-    }
-
-    /// Helper to convert buffer to string for testing.
-    fn buffer_to_string(buf: &Buffer) -> String {
-        let mut result = String::new();
-        for y in 0..buf.area.height {
-            for x in 0..buf.area.width {
-                if let Some(cell) = buf.cell((x, y)) {
-                    result.push_str(cell.symbol());
-                }
-            }
-            result.push('\n');
-        }
-        result
     }
 }

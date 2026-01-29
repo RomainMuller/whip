@@ -70,18 +70,6 @@ categorized by type and prioritized by impact (high/medium/low).
 
 ### Low Priority
 
-#### Code Style
-
-- [ ] **Duplicated buffer_to_string helper**: The `buffer_to_string` function is duplicated across
-      multiple test modules (`board.rs`, `lane.rs`, `help.rs`, `status_bar.rs`, `tests.rs`).
-      Consider extracting to a `test_utils` module.
-- [ ] **Magic numbers in layout code**: Several magic numbers exist (e.g., `HEADER_HEIGHT = 3`,
-      `TASK_CARD_HEIGHT = 4`). While documented as constants, they're duplicated between `app.rs`
-      and `lane.rs`.
-- [ ] **Lane::new is const but allocates Vec**: The `Lane::new` function is marked `const` and
-      returns `Vec::new()`. While this is valid in Rust 2024, it may be surprising. Consider
-      documenting this behavior.
-
 #### Async Patterns
 
 - [ ] **App::run is async but doesn't use async features**: The main loop in `App::run` is async but
@@ -97,15 +85,6 @@ categorized by type and prioritized by impact (high/medium/low).
       or pre-allocated buffers.
 - [ ] **Lane::remove_task is O(n)**: Task removal searches linearly. For large lane sizes, consider
       using an indexed structure or HashMap for task lookup.
-
-#### Safety/Robustness
-
-- [ ] **terminal::install_panic_hook replaces existing hook**: The panic hook installation replaces
-      any previously installed hook. While it chains to the original, be cautious if other crates
-      also install panic hooks.
-- [ ] **No bounds checking on selected_lane in some paths**: While `selected_lane` is generally kept
-      in 0-3 range, some code accesses `board.lanes[selected_lane]` directly. Consider using
-      `lane(LaneKind::from_index(selected_lane))` for added safety.
 
 ### Architecture Notes
 
