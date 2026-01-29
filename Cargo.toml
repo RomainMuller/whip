@@ -46,7 +46,7 @@ insta = { version = "1.41" }
 proptest = { version = "1.5" }
 
 # Markdown parsing
-pulldown-cmark = { version = "0.12" }
+pulldown-cmark = { version = "0.13" }
 
 # Internal crates
 whip-protocol = { path = "crates/protocol" }
