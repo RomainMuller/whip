@@ -1,0 +1,25 @@
+{
+  // Editor defaults from .editorconfig
+  "editor.insertSpaces": true,
+  "editor.trimAutoWhitespace": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.eol": "\n",
+  // Format on save
+  "editor.formatOnSave": true,
+  // Rust
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.tabSize": 4
+  },
+  // Markdown
+  "[markdown]": {
+    "editor.defaultFormatter": "dprint.dprint",
+    "editor.tabSize": 2
+  },
+  // TOML
+  "[toml]": {
+    "editor.defaultFormatter": "dprint.dprint",
+    "editor.tabSize": 4
+  },
+}
