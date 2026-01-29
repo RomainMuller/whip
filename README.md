@@ -36,6 +36,7 @@ whip uses labels to track task state:
 | `whip/failed`                   | Could not complete — requires human attention         |
 
 Sub-status labels provide finer granularity within `in-progress`:
+
 - `whip/status/planning` — working on a plan
 - `whip/status/implementing` — writing code
 - `whip/status/awaiting-subtasks` — waiting for sub-tasks to complete
@@ -67,8 +68,8 @@ Terminal states `abandoned` and `failed` can be reached from most states (see de
    - 👎 **Disapprove** — Must include feedback; agent iterates on the plan
 
 3. **Sub-task creation** — For complex plans, the parent task spawns sub-tasks (referencing the
-   parent issue) and enters `awaiting-subtasks` state. Sub-tasks follow the same workflow but do
-   not create further sub-tasks.
+   parent issue) and enters `awaiting-subtasks` state. Sub-tasks follow the same workflow but do not
+   create further sub-tasks.
 
 4. **Implementation** — Each task runs in an isolated jj workspace (created/cleaned up
    automatically). Multiple agents can work on different tasks in parallel.
@@ -84,8 +85,8 @@ Terminal states `abandoned` and `failed` can be reached from most states (see de
 
 8. **Failure modes**:
    - **Abandoned** — Human closes the issue, or agent determines the task is obsolete
-   - **Failed** — Repeated implementation failures, agent loops, or sub-task failures; UI alerts
-     the human
+   - **Failed** — Repeated implementation failures, agent loops, or sub-task failures; UI alerts the
+     human
 
 ## License
 

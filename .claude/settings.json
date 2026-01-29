@@ -1,4 +1,9 @@
 {
   "defaultMode": "acceptEdits",
-  "model": "opus"
+  "model": "opus",
+  "permissions": {
+    "allow": [
+      "Bash(dprint fmt:*)"
+    ]
+  }
 }
