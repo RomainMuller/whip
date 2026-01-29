@@ -119,14 +119,13 @@ pub fn key_to_message(key: KeyEvent) -> Option<Message> {
 ///
 /// | Key | Action |
 /// |-----|--------|
-/// | `Tab` | Next section |
-/// | `Shift+Tab` | Previous section |
+/// | `Left` | Previous section |
+/// | `Right` | Next section |
 /// | `Up` | Navigate up |
 /// | `Down` | Navigate down |
 /// | `Enter` | Edit/confirm |
 /// | `Esc` | Cancel/close |
 /// | `d` | Delete |
-/// | `s` | Save |
 /// | `Backspace` | Backspace (in edit mode) |
 /// | Any char | Input (in edit mode) |
 #[must_use]
@@ -149,16 +148,12 @@ pub fn key_to_settings_message(key: KeyEvent, is_editing: bool) -> Option<Messag
         // Navigation mode
         match key.code {
             KeyCode::Esc => Some(Message::CloseSettings),
-            KeyCode::Tab if key.modifiers.contains(KeyModifiers::SHIFT) => {
-                Some(Message::SettingsPrevSection)
-            }
-            KeyCode::Tab => Some(Message::SettingsNextSection),
-            KeyCode::BackTab => Some(Message::SettingsPrevSection),
+            KeyCode::Left => Some(Message::SettingsPrevSection),
+            KeyCode::Right => Some(Message::SettingsNextSection),
             KeyCode::Up => Some(Message::SettingsNavigate { delta: -1 }),
             KeyCode::Down => Some(Message::SettingsNavigate { delta: 1 }),
             KeyCode::Enter | KeyCode::Char(' ') => Some(Message::SettingsEdit),
             KeyCode::Char('d') => Some(Message::SettingsDelete),
-            KeyCode::Char('s') => Some(Message::SettingsSave),
             _ => None,
         }
     }
@@ -354,22 +349,19 @@ mod tests {
     // Settings mode tests
     #[test]
     fn settings_navigation_mode() {
-        // Tab moves to next section
+        // Right moves to next section
         assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Tab), false),
+            key_to_settings_message(make_key(KeyCode::Right), false),
             Some(Message::SettingsNextSection)
         );
 
-        // Shift+Tab moves to previous section
+        // Left moves to previous section
         assert_eq!(
-            key_to_settings_message(
-                make_key_with_modifiers(KeyCode::Tab, KeyModifiers::SHIFT),
-                false
-            ),
+            key_to_settings_message(make_key(KeyCode::Left), false),
             Some(Message::SettingsPrevSection)
         );
 
-        // Arrow keys navigate
+        // Up/Down arrow keys navigate within section
         assert_eq!(
             key_to_settings_message(make_key(KeyCode::Up), false),
             Some(Message::SettingsNavigate { delta: -1 })
@@ -389,12 +381,6 @@ mod tests {
         assert_eq!(
             key_to_settings_message(make_key(KeyCode::Char('d')), false),
             Some(Message::SettingsDelete)
-        );
-
-        // s saves
-        assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Char('s')), false),
-            Some(Message::SettingsSave)
         );
 
         // Esc closes

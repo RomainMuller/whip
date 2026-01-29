@@ -322,7 +322,7 @@ fn render_settings_help(state: &SettingsState, area: Rect, buf: &mut Buffer) {
     let help_text = if state.is_editing() {
         "Enter: confirm | Esc: cancel"
     } else {
-        "Tab: sections | Enter: edit | d: delete | s: save | Esc: close"
+        "←→: sections | ↑↓: navigate | Enter: edit | d: delete | Esc: close"
     };
 
     let help = Paragraph::new(Line::from(Span::styled(

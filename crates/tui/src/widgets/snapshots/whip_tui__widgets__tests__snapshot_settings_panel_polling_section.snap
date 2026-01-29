@@ -1,6 +1,5 @@
 ---
 source: crates/tui/src/widgets/tests.rs
-assertion_line: 460
 expression: buffer_to_string(&buf)
 ---
 
@@ -23,6 +22,6 @@ expression: buffer_to_string(&buf)
           │                                                          │
           │                                                          │
           │                                                          │
-          │Tab: sections | Enter: edit | d: delete | s: save | Esc: c│
+          │←→: sections | ↑↓: navigate | Enter: edit | d: delete | Es│
           │                                                          │
           ╰──────────────────────────────────────────────────────────╯
