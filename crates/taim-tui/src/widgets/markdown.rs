@@ -64,17 +64,47 @@ use ratatui::{
 // Table Support
 // ============================================================================
 
+/// A styled table cell containing formatted spans.
+#[derive(Clone, Default)]
+struct StyledCell {
+    spans: Vec<Span<'static>>,
+}
+
+impl StyledCell {
+    /// Returns the display width of the cell content.
+    fn display_width(&self) -> usize {
+        self.spans.iter().map(|s| s.content.chars().count()).sum()
+    }
+
+    /// Returns the plain text content of the cell.
+    fn plain_text(&self) -> String {
+        self.spans.iter().map(|s| s.content.as_ref()).collect()
+    }
+
+    /// Adds a styled span to the cell.
+    fn push(&mut self, span: Span<'static>) {
+        self.spans.push(span);
+    }
+
+    /// Adds a space if the cell is not empty (for soft breaks).
+    fn push_space(&mut self) {
+        if !self.spans.is_empty() {
+            self.spans.push(Span::raw(" "));
+        }
+    }
+}
+
 /// Accumulated data for a table being parsed.
 #[derive(Clone, Default)]
 struct TableAccumulator {
     /// Column headers (from TableHead).
-    headers: Vec<String>,
+    headers: Vec<StyledCell>,
     /// All data rows.
-    rows: Vec<Vec<String>>,
+    rows: Vec<Vec<StyledCell>>,
     /// Current row being built.
-    current_row: Vec<String>,
+    current_row: Vec<StyledCell>,
     /// Current cell content being accumulated.
-    current_cell: String,
+    current_cell: StyledCell,
     /// Whether we're currently in the header section.
     in_header: bool,
 }
@@ -95,7 +125,7 @@ impl TableAccumulator {
         // Consider headers
         for (i, header) in self.headers.iter().enumerate() {
             if i < col_count {
-                widths[i] = widths[i].max(header.chars().count());
+                widths[i] = widths[i].max(header.display_width());
             }
         }
 
@@ -103,7 +133,7 @@ impl TableAccumulator {
         for row in &self.rows {
             for (i, cell) in row.iter().enumerate() {
                 if i < col_count {
-                    widths[i] = widths[i].max(cell.chars().count());
+                    widths[i] = widths[i].max(cell.display_width());
                 }
             }
         }
@@ -234,7 +264,7 @@ fn build_horizontal_border(
 
 /// Builds a data row for box-drawing tables.
 fn build_table_row(
-    cells: &[String],
+    cells: &[StyledCell],
     widths: &[usize],
     border_style: Style,
     is_header: bool,
@@ -245,21 +275,27 @@ fn build_table_row(
     spans.push(Span::styled(box_chars::VERTICAL.to_string(), border_style));
 
     for (i, width) in widths.iter().enumerate() {
-        let content = cells.get(i).map(String::as_str).unwrap_or("");
-        let padding = width.saturating_sub(content.chars().count());
+        let cell = cells.get(i);
+        let content_width = cell.map_or(0, StyledCell::display_width);
+        let padding = width.saturating_sub(content_width);
 
-        // Space + content + padding + space
-        let cell_text = format!(" {content}{} ", " ".repeat(padding));
+        // Leading space
+        spans.push(Span::raw(" "));
 
-        let cell_style = if is_header {
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::White)
-        };
+        // Cell content with styling
+        if let Some(cell) = cell {
+            for span in &cell.spans {
+                let mut style = span.style;
+                if is_header {
+                    // Headers get cyan + bold styling
+                    style = style.fg(Color::Cyan).add_modifier(Modifier::BOLD);
+                }
+                spans.push(Span::styled(span.content.clone(), style));
+            }
+        }
 
-        spans.push(Span::styled(cell_text, cell_style));
+        // Trailing padding + space
+        spans.push(Span::raw(format!("{} ", " ".repeat(padding))));
 
         // Separator
         spans.push(Span::styled(box_chars::VERTICAL.to_string(), border_style));
@@ -283,20 +319,21 @@ fn render_definition_list_table(table: &TableAccumulator, width: usize) -> Vec<L
     let label_style = Style::default()
         .fg(Color::Cyan)
         .add_modifier(Modifier::BOLD);
-    let value_style = Style::default().fg(Color::White);
 
     // Calculate max header width for alignment
     let max_header_width = table
         .headers
         .iter()
-        .map(|h| h.chars().count())
+        .map(|h| h.display_width())
         .max()
         .unwrap_or(0);
 
     for (row_idx, row) in table.rows.iter().enumerate() {
         // Determine row label (use first column if it looks like an identifier)
-        let row_label = if !row.is_empty() && looks_like_identifier(&row[0]) {
-            row[0].clone()
+        let first_cell_text = row.first().map(|c| c.plain_text()).unwrap_or_default();
+        let use_first_as_label = !row.is_empty() && looks_like_identifier(&first_cell_text);
+        let row_label = if use_first_as_label {
+            first_cell_text
         } else {
             format!("Row {}", row_idx + 1)
         };
@@ -322,31 +359,33 @@ fn render_definition_list_table(table: &TableAccumulator, width: usize) -> Vec<L
         lines.push(separator_line);
 
         // Determine which columns to show (skip first if used as label)
-        let start_col = if !row.is_empty() && looks_like_identifier(&row[0]) {
-            1
-        } else {
-            0
-        };
+        let start_col = if use_first_as_label { 1 } else { 0 };
 
         // Render each field
         for col_idx in start_col..row.len() {
             let header = table
                 .headers
                 .get(col_idx)
-                .map(String::as_str)
-                .unwrap_or("Field");
-            let value = row.get(col_idx).map(String::as_str).unwrap_or("");
+                .map(|h| h.plain_text())
+                .unwrap_or_else(|| "Field".to_string());
+            let header_width = header.chars().count();
 
             // Pad header for alignment
-            let header_padding = max_header_width.saturating_sub(header.chars().count());
+            let header_padding = max_header_width.saturating_sub(header_width);
 
-            lines.push(Line::from(vec![
+            let mut line_spans = vec![
                 Span::raw("  "),
-                Span::styled(header.to_string(), label_style),
+                Span::styled(header, label_style),
                 Span::styled(":".to_string(), separator_style),
                 Span::raw(" ".repeat(header_padding + 1)),
-                Span::styled(value.to_string(), value_style),
-            ]));
+            ];
+
+            // Add the styled cell content
+            if let Some(cell) = row.get(col_idx) {
+                line_spans.extend(cell.spans.iter().cloned());
+            }
+
+            lines.push(Line::from(line_spans));
         }
 
         // Blank line between rows (except after last)
@@ -364,21 +403,29 @@ fn render_definition_list_table(table: &TableAccumulator, width: usize) -> Vec<L
 /// Renders a two-column table as simple key-value pairs.
 fn render_key_value_table(table: &TableAccumulator) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
-    let label_style = Style::default()
-        .fg(Color::Cyan)
-        .add_modifier(Modifier::BOLD);
     let separator_style = Style::default().fg(Color::DarkGray);
-    let value_style = Style::default().fg(Color::White);
 
     for row in &table.rows {
-        let key = row.first().map(String::as_str).unwrap_or("");
-        let value = row.get(1).map(String::as_str).unwrap_or("");
+        let mut line_spans = Vec::new();
 
-        lines.push(Line::from(vec![
-            Span::styled(key.to_string(), label_style),
-            Span::styled(": ".to_string(), separator_style),
-            Span::styled(value.to_string(), value_style),
-        ]));
+        // Key (first column) - apply label style
+        if let Some(key_cell) = row.first() {
+            for span in &key_cell.spans {
+                let mut style = span.style;
+                style = style.fg(Color::Cyan).add_modifier(Modifier::BOLD);
+                line_spans.push(Span::styled(span.content.clone(), style));
+            }
+        }
+
+        // Separator
+        line_spans.push(Span::styled(": ".to_string(), separator_style));
+
+        // Value (second column) - keep original styling
+        if let Some(value_cell) = row.get(1) {
+            line_spans.extend(value_cell.spans.iter().cloned());
+        }
+
+        lines.push(Line::from(line_spans));
     }
 
     // Blank line after table
@@ -510,19 +557,24 @@ pub fn render_markdown(markdown: &str, width: usize) -> Vec<Line<'static>> {
                 handle_end_tag(&tag_end, &mut ctx, &mut current_spans, &mut lines, width);
             }
             Event::Text(text) => {
-                // If inside a table cell, accumulate into the table
+                // If inside a table cell, accumulate styled span into the table
+                // Compute style before taking mutable borrow
+                let style = ctx.current_style();
                 if let Some(ref mut table) = ctx.table {
-                    table.current_cell.push_str(&text);
+                    table
+                        .current_cell
+                        .push(Span::styled(text.to_string(), style));
                 } else {
                     handle_text(&text, &ctx, &mut current_spans, &mut lines, width);
                 }
             }
             Event::Code(code) => {
-                // If inside a table cell, accumulate into the table
+                // If inside a table cell, accumulate styled code span
                 if let Some(ref mut table) = ctx.table {
-                    table.current_cell.push('`');
-                    table.current_cell.push_str(&code);
-                    table.current_cell.push('`');
+                    table.current_cell.push(Span::styled(
+                        code.to_string(),
+                        Style::default().fg(Color::Yellow),
+                    ));
                 } else {
                     // Inline code
                     current_spans.push(Span::styled(
@@ -534,7 +586,7 @@ pub fn render_markdown(markdown: &str, width: usize) -> Vec<Line<'static>> {
             Event::SoftBreak => {
                 // If inside a table cell, treat as space
                 if let Some(ref mut table) = ctx.table {
-                    table.current_cell.push(' ');
+                    table.current_cell.push_space();
                 } else {
                     // Soft break - treat as space
                     current_spans.push(Span::raw(" "));
@@ -543,7 +595,7 @@ pub fn render_markdown(markdown: &str, width: usize) -> Vec<Line<'static>> {
             Event::HardBreak => {
                 // If inside a table cell, treat as space
                 if let Some(ref mut table) = ctx.table {
-                    table.current_cell.push(' ');
+                    table.current_cell.push_space();
                 } else {
                     // Hard break - start new line
                     flush_line(&mut current_spans, &mut lines);
@@ -627,7 +679,7 @@ fn handle_start_tag(
         }
         Tag::TableCell => {
             if let Some(ref mut table) = ctx.table {
-                table.current_cell = String::new();
+                table.current_cell = StyledCell::default();
             }
         }
         _ => {}
@@ -691,7 +743,7 @@ fn handle_end_tag(
         TagEnd::TableCell => {
             if let Some(ref mut table) = ctx.table {
                 let cell = std::mem::take(&mut table.current_cell);
-                table.current_row.push(cell.trim().to_string());
+                table.current_row.push(cell);
             }
         }
         TagEnd::TableRow => {
@@ -1322,19 +1374,33 @@ Check [this link](http://test.com).
             .flat_map(|l| l.spans.iter().map(|s| s.content.as_ref()))
             .collect();
 
-        // Code should be preserved (with backticks in definition list mode)
+        // Code should be rendered (without backticks - they're styling markers)
         assert!(
-            content.contains("ls") || content.contains("`ls`"),
-            "should contain the command"
+            content.contains("ls"),
+            "should contain the command: {content}"
         );
         assert!(content.contains("List files"));
+
+        // Code should be styled yellow
+        let has_yellow_ls = lines.iter().any(|l| {
+            l.spans
+                .iter()
+                .any(|s| s.content.contains("ls") && s.style.fg == Some(Color::Yellow))
+        });
+        assert!(has_yellow_ls, "code in cell should be styled yellow");
     }
 
     #[test]
     fn table_box_width_calculation() {
+        fn cell(s: &str) -> StyledCell {
+            StyledCell {
+                spans: vec![Span::raw(s.to_string())],
+            }
+        }
+
         let mut table = TableAccumulator::default();
-        table.headers = vec!["A".to_string(), "BB".to_string()];
-        table.rows = vec![vec!["1".to_string(), "22".to_string()]];
+        table.headers = vec![cell("A"), cell("BB")];
+        table.rows = vec![vec![cell("1"), cell("22")]];
 
         // Column widths: [1, 2]
         // Box width: 1 + (1+3) + (2+3) = 1 + 4 + 5 = 10
