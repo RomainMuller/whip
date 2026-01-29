@@ -117,6 +117,18 @@ jj new -m "wip(claude): <brief intention>"
 This is non-negotiable. Editing files without first creating a new changeset pollutes unrelated
 changesets and violates separation of concerns.
 
+### Formatting and Linting
+
+Before finalizing a commit for PR submission, **always run formatters and linters**:
+
+```bash
+dprint fmt                               # Format all files
+cargo fmt --check                        # Verify Rust formatting
+cargo clippy --workspace -- -D warnings  # Lint Rust code
+```
+
+CI will reject PRs that fail these checks. Fix any issues before pushing.
+
 ### Sub-Agent Commits
 
 When implementation is delegated to sub-agents, each sub-agent should produce its own commit(s) with

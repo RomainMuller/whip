@@ -74,8 +74,9 @@ Terminal states `abandoned` and `failed` can be reached from most states (see de
 4. **Implementation** — Each task runs in an isolated jj workspace (created/cleaned up
    automatically). Multiple agents can work on different tasks in parallel.
 
-5. **Review cycle** — Once a PR is submitted, the task moves to `under-review`. Review feedback
-   moves it back to `in-progress` until a new iteration is pushed. This repeats until approval.
+5. **Review cycle** — Once a PR is submitted, the task moves to `under-review`. The agent monitors
+   CI status and pushes fixes if checks fail. Review feedback from humans moves the task back to
+   `in-progress` until a new iteration is pushed. This repeats until approval.
 
 6. **Validation** — When all sub-tasks complete, the parent task runs a validation pass. If issues
    are found, it returns to planning; otherwise it completes.
