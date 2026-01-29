@@ -4,8 +4,8 @@ A terminal UI application that supervises and orchestrates multiple Claude Code 
 
 ## Project Overview
 
-**whip** is a Rust-based TUI that acts as an "engineering manager" for AI coding agents, spawning and coordinating
-multiple Claude Code subprocesses to tackle complex, parallelizable work.
+**whip** is a Rust-based TUI that acts as an "engineering manager" for AI coding agents, spawning
+and coordinating multiple Claude Code subprocesses to tackle complex, parallelizable work.
 
 ## Architecture
 
@@ -22,7 +22,8 @@ whip/
 └── tests/             # Integration tests
 ```
 
-Nested crates are named `whip-*` but the directory name does not have the `whip-` prefix for simplicity.
+Nested crates are named `whip-*` but the directory name does not have the `whip-` prefix for
+simplicity.
 
 ### Crate Responsibilities
 
@@ -47,14 +48,16 @@ Nested crates are named `whip-*` but the directory name does not have the `whip-
 ## Project Management
 
 - **Backlog**: Managed via [GitHub Issues](../../issues)
-- **Tracking**: Use [GitHub Projects](../../projects) to track issue state (Backlog → In Progress → Done)
+- **Tracking**: Use [GitHub Projects](../../projects) to track issue state (Backlog → In Progress →
+  Done)
 - **Labels**: Use labels to categorize issues (bug, enhancement, documentation, etc.)
 
 ## Local state management
 
 - **Current plans**: stored in the `.localai/plans/` directory at crate root
   - Plans are to be updated as implementation progresses so they stay up-to date
-  - Plans are presented as markdown documents; with a YAML front-matter providing high-level information on the intent
+  - Plans are presented as markdown documents; with a YAML front-matter providing high-level
+    information on the intent
   - Front-matter schema for plans:
     ```yaml
     ---
@@ -69,9 +72,11 @@ Nested crates are named `whip-*` but the directory name does not have the `whip-
     ```
 - **Detailed tasks**: stored in the `.localai/tasks/` directory at crate root
   - Tasks are created from the plans, to fan out work to separate agents
-  - Tasks are presented as markdown documents; with a YAML front-matter linking it to the overarching plan
+  - Tasks are presented as markdown documents; with a YAML front-matter linking it to the
+    overarching plan
   - They contain enough information for the separate agent to independently work on implementation
-  - Sub-agents are to update their assigned task as they progress, including marking sub-tasks as done, etc..
+  - Sub-agents are to update their assigned task as they progress, including marking sub-tasks as
+    done, etc..
   - Front-matter schema for tasks:
     ```yaml
     ---
@@ -84,12 +89,13 @@ Nested crates are named `whip-*` but the directory name does not have the `whip-
     dependencies: [task-NNN]  # Tasks that must complete first
     ---
     ```
-- **Workspaces**: when spinning sub-agents to work concurrently on coding tasks, use the appropriate tool to manage
-  (create/delete) workspaces in the `.localai/workspaces` directory at the crate root; ensuring you always:
+- **Workspaces**: when spinning sub-agents to work concurrently on coding tasks, use the appropriate
+  tool to manage (create/delete) workspaces in the `.localai/workspaces` directory at the crate
+  root; ensuring you always:
   - Retrofit the changes as individual commits into the root/default workspace once done
   - Clean up (i.e, delete) the workspaces after they are no longer needed
-  - Have commits be siblings of each others unless the child depends on changes in the parent (introduce merge commits
-    using conventional commit to describe it)
+  - Have commits be siblings of each others unless the child depends on changes in the parent
+    (introduce merge commits using conventional commit to describe it)
 
 ## Code Style & Conventions
 
@@ -211,8 +217,8 @@ cargo insta review
 
 - **Workspace-level dependencies**: All dependencies must be declared in the root `Cargo.toml` under
   `[workspace.dependencies]`. Individual crates reference them via `dependency.workspace = true`.
-- **Version pinning**: Pin dependencies to at least the minor version (e.g., `"1.40"` not `"1"`) to ensure all required
-  features are available and builds are reproducible.
+- **Version pinning**: Pin dependencies to at least the minor version (e.g., `"1.40"` not `"1"`) to
+  ensure all required features are available and builds are reproducible.
 - Prefer well-maintained crates with > 1M downloads or strong ecosystem presence
 - Audit new dependencies for security and maintenance status
 - Use `cargo update` deliberately to bump versions

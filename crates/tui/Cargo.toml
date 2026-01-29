@@ -1,21 +1,21 @@
 [package]
 name = "whip-tui"
 version = "0.0.1-dev"
-description = "Terminal UI for whip - Ratatui-based Kanban board interface"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Terminal UI for whip - Ratatui-based Kanban board interface"
 
 [dependencies]
 anyhow = { workspace = true }
 crossterm = { workspace = true }
 pulldown-cmark = { workspace = true }
 ratatui = { workspace = true }
-whip-protocol = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+whip-protocol = { workspace = true }
 
 [dev-dependencies]
 chrono = { workspace = true }
-proptest = { workspace = true }
 insta = { workspace = true }
+proptest = { workspace = true }
