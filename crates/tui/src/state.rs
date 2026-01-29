@@ -3,7 +3,7 @@
 //! This module defines the core state structures for the TUI application,
 //! including focus management and selection tracking.
 
-use whip_protocol::{KanbanBoard, Task};
+use whip_protocol::{KanbanBoard, Lane, Task};
 
 /// The current focus area in the UI.
 ///
@@ -40,6 +40,34 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Returns a reference to the currently selected lane.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `selected_lane` is out of bounds. This should never occur
+    /// if navigation methods are used correctly, as they maintain the invariant
+    /// that `selected_lane` is always in the range `0..4`.
+    fn selected_lane_ref(&self) -> &Lane {
+        self.board
+            .lanes
+            .get(self.selected_lane)
+            .expect("selected_lane should always be in bounds (0..4)")
+    }
+
+    /// Returns a mutable reference to the currently selected lane.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `selected_lane` is out of bounds. This should never occur
+    /// if navigation methods are used correctly.
+    #[allow(dead_code)] // Provided for future use and API symmetry
+    fn selected_lane_mut(&mut self) -> &mut Lane {
+        self.board
+            .lanes
+            .get_mut(self.selected_lane)
+            .expect("selected_lane should always be in bounds (0..4)")
+    }
+
     /// Creates a new application state with the given board.
     ///
     /// Initializes with focus on the board, selecting the first lane.
@@ -115,7 +143,7 @@ impl AppState {
 
     /// Moves the task selection up within the current lane.
     pub fn navigate_up(&mut self) {
-        let lane = &self.board.lanes[self.selected_lane];
+        let lane = self.selected_lane_ref();
         if lane.is_empty() {
             self.selected_task = None;
             return;
@@ -138,7 +166,7 @@ impl AppState {
 
     /// Moves the task selection down within the current lane.
     pub fn navigate_down(&mut self) {
-        let lane = &self.board.lanes[self.selected_lane];
+        let lane = self.selected_lane_ref();
         if lane.is_empty() {
             self.selected_task = None;
             return;
@@ -240,7 +268,7 @@ impl AppState {
     #[must_use]
     pub fn selected_task(&self) -> Option<&Task> {
         let task_idx = self.selected_task?;
-        let lane = &self.board.lanes[self.selected_lane];
+        let lane = self.selected_lane_ref();
         lane.tasks.get(task_idx)
     }
 
@@ -253,7 +281,7 @@ impl AppState {
 
     /// Ensures the task selection is valid for the current lane.
     fn clamp_task_selection(&mut self) {
-        let lane = &self.board.lanes[self.selected_lane];
+        let lane = self.selected_lane_ref();
         if lane.is_empty() {
             self.selected_task = None;
         } else if let Some(idx) = self.selected_task

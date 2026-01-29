@@ -17,18 +17,13 @@ use whip_protocol::{KanbanBoard, Message};
 use crate::{
     AppState, Focus,
     event::{event_to_message, poll_event},
+    layout::{HEADER_HEIGHT, TASK_CARD_HEIGHT},
     terminal::AppTerminal,
     widgets::{
         description_area_dimensions, max_scroll_offset, render_board, render_detail_panel,
         render_help_overlay,
     },
 };
-
-/// Height of the header bar in rows.
-const HEADER_HEIGHT: u16 = 3;
-
-/// Height of each task card in rows (must match lane.rs).
-const TASK_CARD_HEIGHT: u16 = 4;
 
 /// The main application struct.
 ///
@@ -197,7 +192,9 @@ impl App {
         let task_idx = (relative_y / TASK_CARD_HEIGHT) as usize;
 
         // Validate the task exists in the clicked lane
-        let lane = &self.state.board.lanes[lane_idx];
+        let Some(lane) = self.state.board.lanes.get(lane_idx) else {
+            return;
+        };
         if task_idx < lane.len() {
             // Select the lane and task
             self.state.selected_lane = lane_idx;

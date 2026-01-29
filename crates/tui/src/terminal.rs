@@ -93,7 +93,24 @@ pub fn restore_terminal(terminal: &mut AppTerminal) -> Result<(), TerminalError>
 /// This ensures that if the application panics, the terminal is left in a
 /// usable state (not in raw mode, cursor visible, main screen buffer).
 ///
-/// Should be called once at application startup before setting up the terminal.
+/// # Panic Hook Chaining
+///
+/// This function replaces the current panic hook but chains to it after
+/// performing terminal restoration. The original hook (captured at the time
+/// of calling this function) will still execute after terminal cleanup.
+///
+/// **Important**: Call this function once at application startup, before
+/// setting up the terminal and before any other crates install their own
+/// panic hooks. Calling multiple times or after other hooks are installed
+/// may result in unexpected hook chain behavior.
+///
+/// # Order of Operations
+///
+/// When a panic occurs, the installed hook:
+/// 1. Disables raw mode (restores line buffering and echo)
+/// 2. Disables mouse capture
+/// 3. Leaves the alternate screen buffer
+/// 4. Calls the original panic hook (typically prints the panic message)
 ///
 /// # Examples
 ///
@@ -101,8 +118,12 @@ pub fn restore_terminal(terminal: &mut AppTerminal) -> Result<(), TerminalError>
 /// use whip_tui::terminal;
 ///
 /// fn main() {
+///     // Install panic hook FIRST, before any terminal setup
 ///     terminal::install_panic_hook();
-///     // Now safe to setup terminal...
+///
+///     let mut terminal = terminal::setup_terminal()
+///         .expect("failed to setup terminal");
+///     // Application code...
 /// }
 /// ```
 pub fn install_panic_hook() {

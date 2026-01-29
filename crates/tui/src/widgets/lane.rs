@@ -64,9 +64,7 @@ const BORDER_SET_LAST: border::Set = border::Set {
 };
 
 use super::task_card::render_task_card;
-
-/// Height of each task card in rows.
-const TASK_CARD_HEIGHT: u16 = 4;
+use crate::layout::TASK_CARD_HEIGHT;
 
 /// Renders a single lane to the buffer.
 ///
@@ -261,6 +259,7 @@ fn calculate_scroll_offset(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::buffer_to_string;
     use whip_protocol::{LaneKind, Task};
 
     #[test]
@@ -328,19 +327,5 @@ mod tests {
         let offset = calculate_scroll_offset(Some(5), 10, 3);
         assert!(offset > 0);
         assert!(offset <= 7);
-    }
-
-    /// Helper to convert buffer to string for testing.
-    fn buffer_to_string(buf: &Buffer) -> String {
-        let mut result = String::new();
-        for y in 0..buf.area.height {
-            for x in 0..buf.area.width {
-                if let Some(cell) = buf.cell((x, y)) {
-                    result.push_str(cell.symbol());
-                }
-            }
-            result.push('\n');
-        }
-        result
     }
 }

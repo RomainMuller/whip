@@ -34,9 +34,13 @@
 
 pub mod app;
 pub mod event;
+pub mod layout;
 pub mod state;
 pub mod terminal;
 pub mod widgets;
+
+#[cfg(test)]
+pub(crate) mod test_utils;
 
 // Re-export primary types at crate root for convenience
 pub use app::App;

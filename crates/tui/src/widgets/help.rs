@@ -160,6 +160,7 @@ fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::buffer_to_string;
 
     #[test]
     fn centered_rect_positions_correctly() {
@@ -234,19 +235,5 @@ mod tests {
         assert!(content.contains("Esc"));
         assert!(content.contains("Quit"));
         assert!(content.contains("?"));
-    }
-
-    /// Helper to convert buffer to string for testing.
-    fn buffer_to_string(buf: &Buffer) -> String {
-        let mut result = String::new();
-        for y in 0..buf.area.height {
-            for x in 0..buf.area.width {
-                if let Some(cell) = buf.cell((x, y)) {
-                    result.push_str(cell.symbol());
-                }
-            }
-            result.push('\n');
-        }
-        result
     }
 }
