@@ -83,6 +83,7 @@ flowchart LR
 **Location:** `/src/main.rs`
 
 Entry point and orchestration:
+
 - CLI argument parsing (planned: clap)
 - Terminal setup/teardown lifecycle
 - Panic hook installation for terminal restoration
@@ -95,15 +96,16 @@ Entry point and orchestration:
 
 Shared data types and contracts (no I/O dependencies):
 
-| Module       | Purpose                                          |
-| ------------ | ------------------------------------------------ |
-| `task.rs`    | `Task`, `TaskId`, `TaskState` - work items       |
-| `board.rs`   | `KanbanBoard`, `Lane`, `LaneKind` - board model  |
-| `message.rs` | `Message` - TUI input events                     |
-| `error.rs`   | `ProtocolError` - domain-specific errors         |
-| `dummy.rs`   | Test data generation with realistic markdown     |
+| Module       | Purpose                                         |
+| ------------ | ----------------------------------------------- |
+| `task.rs`    | `Task`, `TaskId`, `TaskState` - work items      |
+| `board.rs`   | `KanbanBoard`, `Lane`, `LaneKind` - board model |
+| `message.rs` | `Message` - TUI input events                    |
+| `error.rs`   | `ProtocolError` - domain-specific errors        |
+| `dummy.rs`   | Test data generation with realistic markdown    |
 
 **Design Decisions:**
+
 - Pure data types, no I/O operations
 - Serializable via serde for persistence/IPC
 - `thiserror` for typed errors
@@ -195,6 +197,7 @@ stateDiagram-v2
 ### Message (Elm-like Architecture)
 
 The TUI follows an Elm-inspired architecture where:
+
 1. **Events** from terminal are converted to **Messages**
 2. **Messages** are dispatched to **update()** to modify **State**
 3. **State** is rendered to terminal via **view()**
@@ -217,12 +220,14 @@ State (status):      Idle | InFlight | NeedsAttention | Success | Failed
 ```
 
 This separation allows:
+
 - A task in "InProgress" lane to be "NeedsAttention" (blocked)
 - A task in "Done" lane to be "Failed" (completed with error)
 
 ### Widget Rendering (Functional)
 
 Widgets are pure functions: `fn render(state, area, buffer)`:
+
 - No internal state
 - Composable (board renders lanes, lanes render cards)
 - Testable (snapshot tests with insta)
@@ -230,11 +235,13 @@ Widgets are pure functions: `fn render(state, area, buffer)`:
 ## Async Patterns
 
 ### Current Implementation
+
 - `tokio::main` runtime
 - Synchronous event polling with 100ms timeout
 - No concurrent tasks yet (single-threaded UI loop)
 
 ### Planned Patterns (for whip-session)
+
 - `tokio::process::Command` for subprocess spawning
 - `tokio::sync::mpsc` channels for inter-component communication
 - `tokio::select!` for multiplexing subprocess I/O with UI events
@@ -262,16 +269,17 @@ Widgets are pure functions: `fn render(state, area, buffer)`:
 
 ## Testing Strategy
 
-| Type        | Location             | Framework   | Purpose                    |
-| ----------- | -------------------- | ----------- | -------------------------- |
-| Unit        | `#[cfg(test)]`       | built-in    | Core logic                 |
-| Property    | Protocol crate       | proptest    | Serialization roundtrips   |
-| Snapshot    | TUI widgets          | insta       | Visual regression          |
-| Integration | `tests/` (planned)   | tokio::test | Cross-crate                |
+| Type        | Location           | Framework   | Purpose                  |
+| ----------- | ------------------ | ----------- | ------------------------ |
+| Unit        | `#[cfg(test)]`     | built-in    | Core logic               |
+| Property    | Protocol crate     | proptest    | Serialization roundtrips |
+| Snapshot    | TUI widgets        | insta       | Visual regression        |
+| Integration | `tests/` (planned) | tokio::test | Cross-crate              |
 
 ## Configuration (Planned)
 
 Configuration sources (priority high to low):
+
 1. Command-line arguments
 2. Environment variables (`WHIP_*`)
 3. Local config (`./whip.toml`)
