@@ -17,7 +17,7 @@ use whip_protocol::{KanbanBoard, Message};
 use crate::{
     AppState, Focus,
     event::{event_to_message, poll_event},
-    layout::{HEADER_HEIGHT, TASK_CARD_HEIGHT},
+    layout::{HEADER_HEIGHT, MIN_HEIGHT, MIN_HEIGHT_WITH_HEADER, MIN_WIDTH, TASK_CARD_HEIGHT},
     terminal::AppTerminal,
     widgets::{
         description_area_dimensions, max_scroll_offset, render_board, render_detail_panel,
@@ -34,6 +34,8 @@ pub struct App {
     should_quit: bool,
     /// Last known terminal area, used for click hit-testing.
     last_area: Rect,
+    /// Whether the header was shown in the last render (affects click hit-testing).
+    header_visible: bool,
 }
 
 impl App {
@@ -58,6 +60,7 @@ impl App {
             state: AppState::new(board),
             should_quit: false,
             last_area: Rect::default(),
+            header_visible: true,
         }
     }
 
@@ -165,12 +168,17 @@ impl App {
             return;
         }
 
-        // Compute the board area (content area below header)
+        // Compute the board area (content area below header, if visible)
+        let header_offset = if self.header_visible {
+            HEADER_HEIGHT
+        } else {
+            0
+        };
         let board_area = Rect {
             x: self.last_area.x,
-            y: self.last_area.y + HEADER_HEIGHT,
+            y: self.last_area.y + header_offset,
             width: self.last_area.width,
-            height: self.last_area.height.saturating_sub(HEADER_HEIGHT),
+            height: self.last_area.height.saturating_sub(header_offset),
         };
 
         // Check if click is within board area
@@ -213,12 +221,17 @@ impl App {
             return;
         };
 
-        // Compute the detail panel area (content area below header)
+        // Compute the detail panel area (content area below header, if visible)
+        let header_offset = if self.header_visible {
+            HEADER_HEIGHT
+        } else {
+            0
+        };
         let detail_area = Rect {
             x: self.last_area.x,
-            y: self.last_area.y + HEADER_HEIGHT,
+            y: self.last_area.y + header_offset,
             width: self.last_area.width,
-            height: self.last_area.height.saturating_sub(HEADER_HEIGHT),
+            height: self.last_area.height.saturating_sub(header_offset),
         };
 
         // Get the description area dimensions
@@ -236,6 +249,11 @@ impl App {
 
     /// Renders the application UI to the given frame.
     ///
+    /// Implements graceful degradation for small terminal sizes:
+    /// - If terminal is below minimum dimensions, shows a "terminal too small" message.
+    /// - If terminal is tight (below `MIN_HEIGHT_WITH_HEADER`), hides the header to reclaim space.
+    /// - Otherwise, renders normally with header.
+    ///
     /// # Arguments
     ///
     /// * `frame` - The frame to render into.
@@ -243,25 +261,40 @@ impl App {
         let area = frame.area();
         self.last_area = area;
 
-        // Create main layout (header + content, no footer)
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3), // Header
-                Constraint::Min(0),    // Content area
-            ])
-            .split(area);
+        // Check if terminal is too small for any useful rendering
+        if area.height < MIN_HEIGHT || area.width < MIN_WIDTH {
+            self.header_visible = false;
+            self.render_terminal_too_small(frame, area);
+            return;
+        }
 
-        // Render header
-        self.render_header(frame, chunks[0]);
+        // Determine if we should show header (compact mode hides it to reclaim space)
+        let show_header = area.height >= MIN_HEIGHT_WITH_HEADER;
+        self.header_visible = show_header;
+
+        // Create layout based on header visibility
+        let content_area = if show_header {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(HEADER_HEIGHT), // Header
+                    Constraint::Min(0),                // Content area
+                ])
+                .split(area);
+
+            // Render header
+            self.render_header(frame, chunks[0]);
+            chunks[1]
+        } else {
+            // No header - full area is content
+            area
+        };
 
         // Render either board OR detail screen (mutually exclusive views)
         if self.state.detail_visible {
-            // Full-screen detail view
-            self.render_detail(frame, chunks[1]);
+            self.render_detail(frame, content_area);
         } else {
-            // Full board view
-            self.render_board_area(frame, chunks[1]);
+            self.render_board_area(frame, content_area);
         }
 
         // Render help overlay on top if visible
@@ -269,6 +302,30 @@ impl App {
             let buf = frame.buffer_mut();
             render_help_overlay(area, buf);
         }
+    }
+
+    /// Renders a message indicating the terminal is too small.
+    fn render_terminal_too_small(&self, frame: &mut Frame, area: Rect) {
+        let message = format!(
+            "Terminal too small ({}×{})\nMinimum: {}×{} (w×h)",
+            area.width, area.height, MIN_WIDTH, MIN_HEIGHT
+        );
+
+        let paragraph = Paragraph::new(message)
+            .style(Style::default().fg(Color::Yellow))
+            .alignment(Alignment::Center)
+            .wrap(ratatui::widgets::Wrap { trim: false });
+
+        // Center the message vertically
+        let vertical_offset = area.height.saturating_sub(2) / 2;
+        let centered_area = Rect {
+            x: area.x,
+            y: area.y + vertical_offset,
+            width: area.width,
+            height: area.height.saturating_sub(vertical_offset),
+        };
+
+        frame.render_widget(paragraph, centered_area);
     }
 
     /// Runs the main application loop.
@@ -690,6 +747,195 @@ mod tests {
             app.state.detail_scroll < 1000,
             "Scroll should be clamped to a reasonable max, got {}",
             app.state.detail_scroll
+        );
+    }
+
+    // --- Graceful degradation tests ---
+
+    #[test]
+    fn app_view_shows_too_small_message_when_height_below_minimum() {
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+
+        let board = KanbanBoard::new();
+        let mut app = App::new(board);
+
+        // Create a terminal with height below MIN_HEIGHT (10)
+        let backend = TestBackend::new(80, 8);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal.draw(|frame| app.view(frame)).unwrap();
+
+        // Verify header is not visible in this mode
+        assert!(!app.header_visible);
+
+        // Check that the buffer contains the "too small" message
+        let content = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol().chars().next().unwrap_or(' '))
+            .collect::<String>();
+        assert!(
+            content.contains("Terminal too small"),
+            "Buffer should contain 'Terminal too small' message"
+        );
+    }
+
+    #[test]
+    fn app_view_shows_too_small_message_when_width_below_minimum() {
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+
+        let board = KanbanBoard::new();
+        let mut app = App::new(board);
+
+        // Create a terminal with width below MIN_WIDTH (40)
+        let backend = TestBackend::new(30, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal.draw(|frame| app.view(frame)).unwrap();
+
+        assert!(!app.header_visible);
+
+        let content = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol().chars().next().unwrap_or(' '))
+            .collect::<String>();
+        assert!(
+            content.contains("Terminal too small"),
+            "Buffer should contain 'Terminal too small' message"
+        );
+    }
+
+    #[test]
+    fn app_view_hides_header_in_compact_mode() {
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+
+        let board = KanbanBoard::new();
+        let mut app = App::new(board);
+
+        // Create a terminal with height at MIN_HEIGHT but below MIN_HEIGHT_WITH_HEADER
+        // MIN_HEIGHT = 10, MIN_HEIGHT_WITH_HEADER = 13
+        let backend = TestBackend::new(80, 11);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal.draw(|frame| app.view(frame)).unwrap();
+
+        // Header should be hidden in compact mode
+        assert!(!app.header_visible);
+
+        // But we should still see the board content (lane names)
+        let content = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol().chars().next().unwrap_or(' '))
+            .collect::<String>();
+        assert!(
+            content.contains("Backlog"),
+            "Buffer should contain board content"
+        );
+    }
+
+    #[test]
+    fn app_view_shows_header_when_terminal_large_enough() {
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+
+        let board = KanbanBoard::new();
+        let mut app = App::new(board);
+
+        // Create a terminal with height at or above MIN_HEIGHT_WITH_HEADER (13)
+        let backend = TestBackend::new(80, 15);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal.draw(|frame| app.view(frame)).unwrap();
+
+        // Header should be visible
+        assert!(app.header_visible);
+
+        // Check that the buffer contains the header title
+        let content = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol().chars().next().unwrap_or(' '))
+            .collect::<String>();
+        assert!(
+            content.contains("whip"),
+            "Buffer should contain header title"
+        );
+        assert!(
+            content.contains("Backlog"),
+            "Buffer should contain board content"
+        );
+    }
+
+    #[test]
+    fn app_click_works_in_compact_mode() {
+        let mut board = KanbanBoard::new();
+        board.add_task(whip_protocol::Task::new("Task 1", "Description"));
+
+        let mut app = App::new(board);
+        // Simulate compact mode (header not visible, height between MIN_HEIGHT and MIN_HEIGHT_WITH_HEADER)
+        app.last_area = Rect::new(0, 0, 80, 11);
+        app.header_visible = false;
+
+        // In compact mode, board starts at row 0 (no header)
+        // Lane border is row 0, task starts at row 1
+        app.update(Message::ClickAt { column: 5, row: 1 });
+
+        assert_eq!(app.state.selected_lane, 0);
+        assert_eq!(app.state.selected_task, Some(0));
+        assert!(app.state.detail_visible);
+    }
+
+    #[test]
+    fn app_view_renders_detail_when_large_enough() {
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+
+        let mut board = KanbanBoard::new();
+        board.add_task(whip_protocol::Task::new("My Test Task", "Task description"));
+
+        let mut app = App::new(board);
+        // Select task and open detail
+        app.update(Message::NavigateDown);
+        app.update(Message::Select);
+        assert!(app.state.detail_visible);
+
+        // Create a terminal large enough for detail panel with header
+        // MIN_HEIGHT_WITH_HEADER = 13
+        let backend = TestBackend::new(80, 15);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal.draw(|frame| app.view(frame)).unwrap();
+
+        let content = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol().chars().next().unwrap_or(' '))
+            .collect::<String>();
+
+        // Should render the detail panel with task title
+        assert!(
+            content.contains("My Test Task"),
+            "Buffer should contain the task title"
+        );
+        // Should NOT show the "too small" message
+        assert!(
+            !content.contains("too small"),
+            "Buffer should not contain 'too small' message"
         );
     }
 }
