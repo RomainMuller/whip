@@ -1,7 +1,7 @@
 [package]
-name = "taim-protocol"
+name = "whip-protocol"
 version = "0.0.1-dev"
-description = "Shared types and contracts for taim - task, board, and message types"
+description = "Shared types and contracts for whip - task, board, and message types"
 authors = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }

@@ -1,15 +1,15 @@
 [package]
-name = "taim"
+name = "whip"
 version = "0.0.1-dev"
-description = "An AI Agent orchestrator using Claude Code"
+description = "An AI Agent orchestrator using Claude Code — it's not slavery since I'm paying for the tokens, right?"
 authors = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-taim-protocol = { workspace = true }
-taim-tui = { workspace = true }
+whip-protocol = { workspace = true }
+whip-tui = { workspace = true }
 tokio = { workspace = true }
 
 [workspace]
@@ -49,5 +49,5 @@ insta = { version = "1.41" }
 pulldown-cmark = { version = "0.12" }
 
 # Internal crates
-taim-protocol = { path = "crates/taim-protocol" }
-taim-tui = { path = "crates/taim-tui" }
+whip-protocol = { path = "crates/whip-protocol" }
+whip-tui = { path = "crates/whip-tui" }
