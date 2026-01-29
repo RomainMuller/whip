@@ -13,6 +13,7 @@ pulldown-cmark = { workspace = true }
 ratatui = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+whip-config = { workspace = true }
 whip-protocol = { workspace = true }
 
 [dev-dependencies]

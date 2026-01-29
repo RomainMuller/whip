@@ -1,6 +1,6 @@
 ---
-source: crates/whip-tui/src/widgets/tests.rs
-assertion_line: 401
+source: crates/tui/src/widgets/tests.rs
+assertion_line: 404
 expression: buffer_to_string(&buf)
 ---
   ╭ Help ───────────────────────────╮
@@ -14,7 +14,7 @@ expression: buffer_to_string(&buf)
   │  Actions                        │
   │  Enter      Open details        │
   │  Esc        Close panel         │
+  │  Shift+S    Open settings       │
   │  Ctrl+C     Quit                │
   │  ?          Toggle help         │
-  │                                 │
   ╰─────────────────────────────────╯

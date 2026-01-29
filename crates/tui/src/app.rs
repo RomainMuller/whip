@@ -10,18 +10,20 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph},
 };
+use whip_config::Config;
 use whip_protocol::{KanbanBoard, Message};
 
 // Note: render_board is used via self.render_board() wrapper, not directly
 
 use crate::{
     AppState, Focus,
-    event::{event_to_message, poll_event},
+    event::{event_to_message, key_to_settings_message, poll_event},
     layout::{HEADER_HEIGHT, MIN_HEIGHT, MIN_HEIGHT_WITH_HEADER, MIN_WIDTH, TASK_CARD_HEIGHT},
+    settings_state::SettingsState,
     terminal::AppTerminal,
     widgets::{
         description_area_dimensions, max_scroll_offset, render_board, render_detail_panel,
-        render_help_overlay,
+        render_help_overlay, render_settings_panel,
     },
 };
 
@@ -36,6 +38,10 @@ pub struct App {
     last_area: Rect,
     /// Whether the header was shown in the last render (affects click hit-testing).
     header_visible: bool,
+    /// Settings panel state, if open.
+    settings_state: Option<SettingsState>,
+    /// The application configuration.
+    config: Config,
 }
 
 impl App {
@@ -61,6 +67,38 @@ impl App {
             should_quit: false,
             last_area: Rect::default(),
             header_visible: true,
+            settings_state: None,
+            config: Config::default(),
+        }
+    }
+
+    /// Creates a new application with the given Kanban board and configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `board` - The initial Kanban board to display.
+    /// * `config` - The application configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use whip_config::Config;
+    /// use whip_protocol::KanbanBoard;
+    /// use whip_tui::App;
+    ///
+    /// let board = KanbanBoard::new();
+    /// let config = Config::default();
+    /// let app = App::with_config(board, config);
+    /// ```
+    #[must_use]
+    pub fn with_config(board: KanbanBoard, config: Config) -> Self {
+        Self {
+            state: AppState::new(board),
+            should_quit: false,
+            last_area: Rect::default(),
+            header_visible: true,
+            settings_state: None,
+            config,
         }
     }
 
@@ -68,6 +106,18 @@ impl App {
     #[must_use]
     pub fn state(&self) -> &AppState {
         &self.state
+    }
+
+    /// Returns a reference to the application configuration.
+    #[must_use]
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    /// Returns whether the settings panel is open.
+    #[must_use]
+    pub fn is_settings_open(&self) -> bool {
+        self.settings_state.is_some()
     }
 
     /// Updates the application state based on a message.
@@ -80,6 +130,62 @@ impl App {
     ///
     /// * `msg` - The message to process.
     pub fn update(&mut self, msg: Message) {
+        // Handle settings-specific messages when settings panel is open
+        if let Some(ref mut settings) = self.settings_state {
+            match msg {
+                Message::Quit => {
+                    self.should_quit = true;
+                }
+                Message::CloseSettings | Message::Escape if !settings.is_editing() => {
+                    // Close settings, potentially applying changes
+                    if let Some(settings) = self.settings_state.take() {
+                        self.config = settings.into_config();
+                    }
+                    self.state.focus = Focus::Board;
+                }
+                Message::SettingsNextSection => {
+                    settings.next_section();
+                }
+                Message::SettingsPrevSection => {
+                    settings.prev_section();
+                }
+                Message::SettingsNavigate { delta } => {
+                    settings.navigate(delta);
+                }
+                Message::SettingsEdit => {
+                    settings.start_edit();
+                }
+                Message::SettingsConfirm => {
+                    settings.confirm_edit();
+                }
+                Message::SettingsCancel | Message::Escape => {
+                    settings.cancel_edit();
+                }
+                Message::SettingsDelete => {
+                    let _ = settings.delete_selected();
+                }
+                Message::SettingsSave => {
+                    // Save config to file
+                    if let Ok(path) = whip_config::persistence::default_user_config_path() {
+                        let _ = settings.config().save_to(&path);
+                        settings.mark_saved();
+                    }
+                }
+                Message::SettingsInput { ch } => {
+                    settings.input_char(ch);
+                }
+                Message::SettingsBackspace => {
+                    settings.backspace();
+                }
+                // Toggle settings item (for checkboxes)
+                Message::Select if !settings.is_editing() => {
+                    settings.toggle_selected();
+                }
+                _ => {}
+            }
+            return;
+        }
+
         // When help is visible, most keys should dismiss it
         if self.state.help_visible {
             match msg {
@@ -100,6 +206,10 @@ impl App {
         match msg {
             Message::Quit => {
                 self.should_quit = true;
+            }
+            Message::OpenSettings => {
+                self.settings_state = Some(SettingsState::new(self.config.clone()));
+                self.state.focus = Focus::Settings;
             }
             Message::Escape => {
                 // Contextual escape: close detail panel if open, or clear selection
@@ -156,6 +266,8 @@ impl App {
             Message::ClickAt { column, row } => {
                 self.handle_click(column, row);
             }
+            // Settings messages are handled above when settings is open
+            _ => {}
         }
     }
 
@@ -302,6 +414,12 @@ impl App {
             let buf = frame.buffer_mut();
             render_help_overlay(area, buf);
         }
+
+        // Render settings panel overlay on top if open
+        if let Some(ref settings) = self.settings_state {
+            let buf = frame.buffer_mut();
+            render_settings_panel(settings, area, buf);
+        }
     }
 
     /// Renders a message indicating the terminal is too small.
@@ -353,15 +471,30 @@ impl App {
     /// }
     /// ```
     pub async fn run(&mut self, terminal: &mut AppTerminal) -> anyhow::Result<()> {
+        use crossterm::event::Event;
+
         loop {
             // Render
             terminal.draw(|frame| self.view(frame))?;
 
             // Poll for events (keyboard and mouse)
-            if let Some(event) = poll_event()?
-                && let Some(msg) = event_to_message(&event)
-            {
-                self.update(msg);
+            if let Some(event) = poll_event()? {
+                // Handle key events differently when settings is open
+                let msg = if self.settings_state.is_some() {
+                    if let Event::Key(key) = event {
+                        let is_editing =
+                            self.settings_state.as_ref().is_some_and(|s| s.is_editing());
+                        key_to_settings_message(key, is_editing)
+                    } else {
+                        event_to_message(&event)
+                    }
+                } else {
+                    event_to_message(&event)
+                };
+
+                if let Some(msg) = msg {
+                    self.update(msg);
+                }
             }
 
             // Check for quit
@@ -937,5 +1070,104 @@ mod tests {
             !content.contains("too small"),
             "Buffer should not contain 'too small' message"
         );
+    }
+
+    // --- Settings panel tests ---
+
+    #[test]
+    fn app_open_settings() {
+        let board = KanbanBoard::new();
+        let mut app = App::new(board);
+
+        assert!(!app.is_settings_open());
+
+        app.update(Message::OpenSettings);
+        assert!(app.is_settings_open());
+        assert_eq!(app.state.focus, Focus::Settings);
+    }
+
+    #[test]
+    fn app_close_settings() {
+        let board = KanbanBoard::new();
+        let mut app = App::new(board);
+
+        app.update(Message::OpenSettings);
+        assert!(app.is_settings_open());
+
+        app.update(Message::CloseSettings);
+        assert!(!app.is_settings_open());
+        assert_eq!(app.state.focus, Focus::Board);
+    }
+
+    #[test]
+    fn app_settings_navigation() {
+        let board = KanbanBoard::new();
+        let mut app = App::new(board);
+
+        app.update(Message::OpenSettings);
+
+        // Navigate sections
+        app.update(Message::SettingsNextSection);
+        if let Some(ref state) = app.settings_state {
+            assert_eq!(
+                state.section(),
+                crate::settings_state::SettingsSection::Polling
+            );
+        }
+
+        app.update(Message::SettingsPrevSection);
+        if let Some(ref state) = app.settings_state {
+            assert_eq!(
+                state.section(),
+                crate::settings_state::SettingsSection::Repositories
+            );
+        }
+    }
+
+    #[test]
+    fn app_settings_escape_closes() {
+        let board = KanbanBoard::new();
+        let mut app = App::new(board);
+
+        app.update(Message::OpenSettings);
+        assert!(app.is_settings_open());
+
+        app.update(Message::Escape);
+        assert!(!app.is_settings_open());
+    }
+
+    #[test]
+    fn app_with_config() {
+        let board = KanbanBoard::new();
+        let config = Config {
+            github_token: Some("test_token".to_string()),
+            ..Default::default()
+        };
+
+        let app = App::with_config(board, config);
+        assert_eq!(app.config().github_token, Some("test_token".to_string()));
+    }
+
+    #[test]
+    fn app_settings_preserves_config_on_close() {
+        use whip_config::Repository;
+
+        let board = KanbanBoard::new();
+        let mut config = Config::default();
+        config.repositories.push(Repository::new("owner", "repo"));
+
+        let mut app = App::with_config(board, config);
+
+        // Open settings, make a change, close
+        app.update(Message::OpenSettings);
+
+        // Delete the repository
+        app.update(Message::SettingsDelete);
+
+        // Close settings
+        app.update(Message::CloseSettings);
+
+        // Config should be updated
+        assert!(app.config().repositories.is_empty());
     }
 }

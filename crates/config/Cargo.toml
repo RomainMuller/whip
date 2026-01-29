@@ -1,0 +1,18 @@
+[package]
+name = "whip-config"
+version = "0.0.1-dev"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Configuration management for whip - handles config loading, validation, and persistence"
+
+[dependencies]
+dirs = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_json5 = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["process"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }

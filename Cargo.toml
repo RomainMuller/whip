@@ -9,8 +9,13 @@ description = "An AI Agent orchestrator using Claude Code"
 [dependencies]
 anyhow = { workspace = true }
 tokio = { workspace = true }
+whip-config = { workspace = true }
 whip-protocol = { workspace = true }
 whip-tui = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tempfile = { workspace = true }
 
 [workspace]
 resolver = "3"
@@ -25,6 +30,7 @@ license = "MIT"
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
+serde_json5 = { version = "0.2" }
 
 # Async runtime
 tokio = { version = "1.43", features = ["full"] }
@@ -39,15 +45,18 @@ thiserror = { version = "2.0" }
 
 # Utilities
 chrono = { version = "0.4", features = ["serde"] }
+dirs = { version = "5.0" }
 uuid = { version = "1.11", features = ["v4", "serde"] }
 
 # Testing
 insta = { version = "1.41" }
 proptest = { version = "1.5" }
+tempfile = { version = "3.14" }
 
 # Markdown parsing
 pulldown-cmark = { version = "0.13" }
 
 # Internal crates
+whip-config = { path = "crates/config" }
 whip-protocol = { path = "crates/protocol" }
 whip-tui = { path = "crates/tui" }

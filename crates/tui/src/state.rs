@@ -15,6 +15,8 @@ pub enum Focus {
     Board,
     /// Focus is on the task detail panel.
     Detail,
+    /// Focus is on the settings panel.
+    Settings,
 }
 
 /// The application state.

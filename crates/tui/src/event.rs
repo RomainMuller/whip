@@ -74,11 +74,17 @@ fn mouse_to_message(mouse: &crossterm::event::MouseEvent) -> Option<Message> {
 /// | `Backspace` | Back |
 /// | `r` | Refresh |
 /// | `?` | Toggle help |
+/// | `Shift+S` | Open settings |
 #[must_use]
 pub fn key_to_message(key: KeyEvent) -> Option<Message> {
     // Check for Ctrl+C first
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
         return Some(Message::Quit);
+    }
+
+    // Check for Shift+S to open settings
+    if key.modifiers.contains(KeyModifiers::SHIFT) && key.code == KeyCode::Char('S') {
+        return Some(Message::OpenSettings);
     }
 
     // Regular keys
@@ -101,6 +107,60 @@ pub fn key_to_message(key: KeyEvent) -> Option<Message> {
         KeyCode::Char('?') => Some(Message::ToggleHelp),
 
         _ => None,
+    }
+}
+
+/// Converts a key event to a settings-specific message.
+///
+/// This function is used when the settings panel is open to handle
+/// settings-specific key bindings.
+///
+/// # Key Bindings (Settings Mode)
+///
+/// | Key | Action |
+/// |-----|--------|
+/// | `Tab` | Next section |
+/// | `Shift+Tab` | Previous section |
+/// | `Up` | Navigate up |
+/// | `Down` | Navigate down |
+/// | `Enter` | Edit/confirm |
+/// | `Esc` | Cancel/close |
+/// | `d` | Delete |
+/// | `s` | Save |
+/// | `Backspace` | Backspace (in edit mode) |
+/// | Any char | Input (in edit mode) |
+#[must_use]
+pub fn key_to_settings_message(key: KeyEvent, is_editing: bool) -> Option<Message> {
+    // Check for Ctrl+C first (always works)
+    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+        return Some(Message::Quit);
+    }
+
+    if is_editing {
+        // In edit mode, capture text input
+        match key.code {
+            KeyCode::Enter => Some(Message::SettingsConfirm),
+            KeyCode::Esc => Some(Message::SettingsCancel),
+            KeyCode::Backspace => Some(Message::SettingsBackspace),
+            KeyCode::Char(ch) => Some(Message::SettingsInput { ch }),
+            _ => None,
+        }
+    } else {
+        // Navigation mode
+        match key.code {
+            KeyCode::Esc => Some(Message::CloseSettings),
+            KeyCode::Tab if key.modifiers.contains(KeyModifiers::SHIFT) => {
+                Some(Message::SettingsPrevSection)
+            }
+            KeyCode::Tab => Some(Message::SettingsNextSection),
+            KeyCode::BackTab => Some(Message::SettingsPrevSection),
+            KeyCode::Up => Some(Message::SettingsNavigate { delta: -1 }),
+            KeyCode::Down => Some(Message::SettingsNavigate { delta: 1 }),
+            KeyCode::Enter | KeyCode::Char(' ') => Some(Message::SettingsEdit),
+            KeyCode::Char('d') => Some(Message::SettingsDelete),
+            KeyCode::Char('s') => Some(Message::SettingsSave),
+            _ => None,
+        }
     }
 }
 
@@ -211,6 +271,18 @@ mod tests {
     }
 
     #[test]
+    fn open_settings_key() {
+        // Shift+S opens settings
+        assert_eq!(
+            key_to_message(make_key_with_modifiers(
+                KeyCode::Char('S'),
+                KeyModifiers::SHIFT
+            )),
+            Some(Message::OpenSettings)
+        );
+    }
+
+    #[test]
     fn unmapped_keys_return_none() {
         assert_eq!(key_to_message(make_key(KeyCode::Char('x'))), None);
         assert_eq!(key_to_message(make_key(KeyCode::F(1))), None);
@@ -277,5 +349,104 @@ mod tests {
     fn event_to_message_ignores_resize_events() {
         let resize_event = Event::Resize(80, 24);
         assert_eq!(event_to_message(&resize_event), None);
+    }
+
+    // Settings mode tests
+    #[test]
+    fn settings_navigation_mode() {
+        // Tab moves to next section
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Tab), false),
+            Some(Message::SettingsNextSection)
+        );
+
+        // Shift+Tab moves to previous section
+        assert_eq!(
+            key_to_settings_message(
+                make_key_with_modifiers(KeyCode::Tab, KeyModifiers::SHIFT),
+                false
+            ),
+            Some(Message::SettingsPrevSection)
+        );
+
+        // Arrow keys navigate
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Up), false),
+            Some(Message::SettingsNavigate { delta: -1 })
+        );
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Down), false),
+            Some(Message::SettingsNavigate { delta: 1 })
+        );
+
+        // Enter starts edit
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Enter), false),
+            Some(Message::SettingsEdit)
+        );
+
+        // d deletes
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Char('d')), false),
+            Some(Message::SettingsDelete)
+        );
+
+        // s saves
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Char('s')), false),
+            Some(Message::SettingsSave)
+        );
+
+        // Esc closes
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Esc), false),
+            Some(Message::CloseSettings)
+        );
+    }
+
+    #[test]
+    fn settings_edit_mode() {
+        // Character input
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Char('a')), true),
+            Some(Message::SettingsInput { ch: 'a' })
+        );
+
+        // Backspace
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Backspace), true),
+            Some(Message::SettingsBackspace)
+        );
+
+        // Enter confirms
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Enter), true),
+            Some(Message::SettingsConfirm)
+        );
+
+        // Esc cancels
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Esc), true),
+            Some(Message::SettingsCancel)
+        );
+    }
+
+    #[test]
+    fn settings_ctrl_c_always_quits() {
+        // Ctrl+C works in both modes
+        assert_eq!(
+            key_to_settings_message(
+                make_key_with_modifiers(KeyCode::Char('c'), KeyModifiers::CONTROL),
+                false
+            ),
+            Some(Message::Quit)
+        );
+        assert_eq!(
+            key_to_settings_message(
+                make_key_with_modifiers(KeyCode::Char('c'), KeyModifiers::CONTROL),
+                true
+            ),
+            Some(Message::Quit)
+        );
     }
 }

@@ -20,8 +20,10 @@ fn test_task(title: &str, description: &str) -> Task {
 
 use super::{
     LanePosition, render_board, render_detail_panel, render_help_overlay, render_lane,
-    render_status_bar, render_task_card,
+    render_settings_panel, render_status_bar, render_task_card,
 };
+use crate::settings_state::SettingsState;
+use whip_config::{Config, PollingConfig, Repository};
 
 /// Creates a sample board with tasks in various states for testing.
 fn create_sample_board() -> KanbanBoard {
@@ -398,6 +400,107 @@ fn snapshot_help_overlay_small_terminal() {
     let mut buf = Buffer::empty(area);
 
     render_help_overlay(area, &mut buf);
+
+    insta::assert_snapshot!(buffer_to_string(&buf));
+}
+
+// --- Settings panel snapshot tests ---
+
+#[test]
+fn snapshot_settings_panel_empty() {
+    let config = Config::default();
+    let state = SettingsState::new(config);
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+
+    render_settings_panel(&state, area, &mut buf);
+
+    insta::assert_snapshot!(buffer_to_string(&buf));
+}
+
+#[test]
+fn snapshot_settings_panel_with_repositories() {
+    let mut config = Config::default();
+    config
+        .repositories
+        .push(Repository::new("rust-lang", "rust"));
+    config
+        .repositories
+        .push(Repository::new("tokio-rs", "tokio"));
+    config.repositories.push(Repository::with_token(
+        "private-org",
+        "secret-repo",
+        "ghp_xxx",
+    ));
+
+    let state = SettingsState::new(config);
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+
+    render_settings_panel(&state, area, &mut buf);
+
+    insta::assert_snapshot!(buffer_to_string(&buf));
+}
+
+#[test]
+fn snapshot_settings_panel_polling_section() {
+    let config = Config {
+        polling: PollingConfig::with_interval(120),
+        ..Default::default()
+    };
+
+    let mut state = SettingsState::new(config);
+    state.next_section(); // Navigate to Polling section
+
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+
+    render_settings_panel(&state, area, &mut buf);
+
+    insta::assert_snapshot!(buffer_to_string(&buf));
+}
+
+#[test]
+fn snapshot_settings_panel_authentication_section() {
+    let config = Config {
+        github_token: Some("ghp_test_token_12345".to_string()),
+        ..Default::default()
+    };
+
+    let mut state = SettingsState::new(config);
+    state.next_section(); // Skip to Polling
+    state.next_section(); // Navigate to Authentication section
+
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+
+    render_settings_panel(&state, area, &mut buf);
+
+    insta::assert_snapshot!(buffer_to_string(&buf));
+}
+
+#[test]
+fn snapshot_settings_panel_dirty() {
+    let config = Config::default();
+    let mut state = SettingsState::new(config);
+    state.mark_dirty();
+
+    let area = Rect::new(0, 0, 80, 24);
+    let mut buf = Buffer::empty(area);
+
+    render_settings_panel(&state, area, &mut buf);
+
+    insta::assert_snapshot!(buffer_to_string(&buf));
+}
+
+#[test]
+fn snapshot_settings_panel_small_terminal() {
+    let config = Config::default();
+    let state = SettingsState::new(config);
+    let area = Rect::new(0, 0, 50, 18);
+    let mut buf = Buffer::empty(area);
+
+    render_settings_panel(&state, area, &mut buf);
 
     insta::assert_snapshot!(buffer_to_string(&buf));
 }

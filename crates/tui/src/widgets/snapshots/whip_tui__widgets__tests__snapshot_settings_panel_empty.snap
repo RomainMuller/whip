@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/widgets/tests.rs
+assertion_line: 418
+expression: buffer_to_string(&buf)
+---
+
+          ╭ Settings ────────────────────────────────────────────────╮
+          │          Repositories | Polling | Authentication         │
+          │                                                          │
+          │> + Add repository...                                     │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │                                                          │
+          │Tab: sections | Enter: edit | d: delete | s: save | Esc: c│
+          │                                                          │
+          ╰──────────────────────────────────────────────────────────╯
