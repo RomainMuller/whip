@@ -1,35 +1,35 @@
-# taim — Tame AI
+# whip — it's not slavery since I'm paying for the tokens, right?
 
 A terminal UI application that supervises and orchestrates multiple Claude Code instances.
 
 ## Project Overview
 
-**taim** is a Rust-based TUI that acts as an "engineering manager" for AI coding agents, spawning and coordinating multiple Claude Code subprocesses to tackle complex, parallelizable work.
+**whip** is a Rust-based TUI that acts as an "engineering manager" for AI coding agents, spawning and coordinating multiple Claude Code subprocesses to tackle complex, parallelizable work.
 
 ## Architecture
 
 ### Workspace Structure
 
 ```
-taim/
-├── Cargo.toml              # Workspace root + CLI binary
+whip/
+├── Cargo.toml         # Workspace root + CLI binary
 ├── crates/
-│   ├── taim-tui/           # Ratatui-based terminal UI
-│   ├── taim-session/       # Claude Code subprocess management
-│   ├── taim-protocol/      # Message types, events, shared contracts
-│   └── taim-config/        # Configuration loading & validation
-└── tests/                  # Integration tests
+│   ├── tui/           # Ratatui-based terminal UI
+│   ├── session/       # Claude Code subprocess management
+│   ├── protocol/      # Message types, events, shared contracts
+│   └── config/        # Configuration loading & validation
+└── tests/             # Integration tests
 ```
 
 ### Crate Responsibilities
 
 | Crate | Purpose |
 |-------|---------|
-| `taim` (root) | CLI entrypoint, arg parsing, orchestration |
-| `taim-tui` | UI components, layout, input handling, rendering |
-| `taim-session` | Spawn/manage Claude Code processes, I/O streaming |
-| `taim-protocol` | Shared types (events, messages, errors) — no I/O |
-| `taim-config` | Config file parsing, defaults, validation |
+| `whip` (root) | CLI entrypoint, arg parsing, orchestration |
+| `whip-tui` | UI components, layout, input handling, rendering |
+| `whip-session` | Spawn/manage Claude Code processes, I/O streaming |
+| `whip-protocol` | Shared types (events, messages, errors) — no I/O |
+| `whip-config` | Config file parsing, defaults, validation |
 
 ## Technology Stack
 
@@ -102,7 +102,7 @@ taim/
 - Types: `PascalCase`
 - Functions/methods: `snake_case`
 - Constants: `SCREAMING_SNAKE_CASE`
-- Crate names: `taim-*` (kebab-case)
+- Crate names: `whip-*` (kebab-case)
 - Module files: `snake_case.rs`
 
 ### Error Handling
@@ -129,7 +129,7 @@ pub enum SessionError {
 - Use `tokio::select!` for multiplexing; always handle cancellation gracefully
 - Avoid blocking the async runtime — offload CPU-heavy work to `spawn_blocking`
 
-### TUI Patterns (taim-tui)
+### TUI Patterns (whip-tui)
 
 - Separate **state** (data) from **view** (rendering)
 - Use message-passing for state updates (Elm-ish architecture)
@@ -168,7 +168,7 @@ proptest! {
 ```rust
 #[test]
 fn test_help_output() {
-    let output = Command::new("taim").arg("--help").output().unwrap();
+    let output = Command::new("whip").arg("--help").output().unwrap();
     insta::assert_snapshot!(String::from_utf8_lossy(&output.stdout));
 }
 ```
@@ -192,7 +192,7 @@ cargo run -- [args]
 cargo test --workspace
 
 # Test specific crate
-cargo test -p taim-session
+cargo test -p whip-session
 
 # Clippy (treat warnings as errors)
 cargo clippy --workspace -- -D warnings

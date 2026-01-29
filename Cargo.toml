@@ -49,5 +49,5 @@ insta = { version = "1.41" }
 pulldown-cmark = { version = "0.12" }
 
 # Internal crates
-whip-protocol = { path = "crates/whip-protocol" }
-whip-tui = { path = "crates/whip-tui" }
+whip-protocol = { path = "crates/protocol" }
+whip-tui = { path = "crates/tui" }

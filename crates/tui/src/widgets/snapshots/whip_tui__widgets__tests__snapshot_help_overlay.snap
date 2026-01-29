@@ -1,0 +1,25 @@
+---
+source: crates/whip-tui/src/widgets/tests.rs
+assertion_line: 391
+expression: buffer_to_string(&buf)
+---
+
+
+
+                      ╭ Help ───────────────────────────╮
+                      │                                 │
+                      │  Navigation                     │
+                      │  ←          Move left           │
+                      │  →          Move right          │
+                      │  ↑          Select previous     │
+                      │  ↓          Select next         │
+                      │                                 │
+                      │  Actions                        │
+                      │  Enter      Open details        │
+                      │  Esc        Close panel         │
+                      │  Ctrl+C     Quit                │
+                      │  ?          Toggle help         │
+                      │                                 │
+                      │  Press any key to close         │
+                      │                                 │
+                      ╰─────────────────────────────────╯

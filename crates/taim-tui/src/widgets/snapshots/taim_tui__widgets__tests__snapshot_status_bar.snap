@@ -1,7 +1,0 @@
----
-source: crates/taim-tui/src/widgets/tests.rs
-expression: buffer_to_string(&buf)
----
-┌──────────────────────────────────────────────────────────────────────────────┐
-│Ctrl+C Quit  ←→↑↓ Navigate  Enter Select                                      │
-└──────────────────────────────────────────────────────────────────────────────┘

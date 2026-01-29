@@ -842,48 +842,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "taim"
-version = "0.0.1-dev"
-dependencies = [
- "anyhow",
- "taim-protocol",
- "taim-tui",
- "tokio",
-]
-
-[[package]]
-name = "taim-claude"
-version = "0.0.1-dev"
-
-[[package]]
-name = "taim-protocol"
-version = "0.0.1-dev"
-dependencies = [
- "chrono",
- "proptest",
- "serde",
- "serde_json",
- "thiserror",
- "uuid",
-]
-
-[[package]]
-name = "taim-tui"
-version = "0.0.1-dev"
-dependencies = [
- "anyhow",
- "chrono",
- "crossterm",
- "insta",
- "proptest",
- "pulldown-cmark",
- "ratatui",
- "taim-protocol",
- "thiserror",
- "tokio",
-]
-
-[[package]]
 name = "tempfile"
 version = "3.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1070,6 +1028,44 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f01b580c9ac74c8d8f0c0e4afb04eeef2acf145458e52c03845ee9cd23e3d12"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "whip"
+version = "0.0.1-dev"
+dependencies = [
+ "anyhow",
+ "tokio",
+ "whip-protocol",
+ "whip-tui",
+]
+
+[[package]]
+name = "whip-protocol"
+version = "0.0.1-dev"
+dependencies = [
+ "chrono",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
+name = "whip-tui"
+version = "0.0.1-dev"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "crossterm",
+ "insta",
+ "proptest",
+ "pulldown-cmark",
+ "ratatui",
+ "thiserror",
+ "tokio",
+ "whip-protocol",
 ]
 
 [[package]]

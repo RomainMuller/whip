@@ -1,0 +1,19 @@
+---
+source: crates/whip-tui/src/widgets/tests.rs
+expression: buffer_to_string(&buf)
+---
+┬In Progress (2)─────────
+│┌──────────────────────┐
+││Active task           │
+││Currently being wor...│
+│└──────────────────────┘
+│┌──────────────────────┐
+││Waiting task          │
+││In queue              │
+│└──────────────────────┘
+│
+│
+│
+│
+│
+┴────────────────────────
