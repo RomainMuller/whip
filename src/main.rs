@@ -1,9 +1,9 @@
-//! taim - An AI Agent orchestrator using Claude Code.
+//! whip - An AI Agent orchestrator using Claude Code.
 //!
 //! This is the main binary that launches the TUI application.
 
-use taim_protocol::dummy::dummy_board;
-use taim_tui::{App, terminal};
+use whip_protocol::dummy::dummy_board;
+use whip_tui::{App, terminal};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

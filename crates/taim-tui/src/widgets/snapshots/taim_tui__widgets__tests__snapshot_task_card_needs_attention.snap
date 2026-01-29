@@ -1,9 +1,0 @@
----
-source: crates/taim-tui/src/widgets/tests.rs
-assertion_line: 166
-expression: buffer_to_string(&buf)
----
-┌────────────────────┐
-│Blocked Task        │
-│Needs input from PM │
-└────────────────────┘

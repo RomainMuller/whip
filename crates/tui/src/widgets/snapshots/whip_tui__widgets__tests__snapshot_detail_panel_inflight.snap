@@ -1,0 +1,24 @@
+---
+source: crates/whip-tui/src/widgets/tests.rs
+expression: buffer_to_string(&buf)
+---
+╭ Active Task ─────────────────────────╮
+│Lane: In Progress  │  ● In Progress   │
+│Created: 2025-01-15 10:30             │
+│Updated: 2025-01-15 10:30             │
+│──────────────────────────────────────│
+│Work in progress on this feature.     │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│──────────────────────────────────────│
+│[Esc] Back to board  [↑↓] Scroll      │
+╰──────────────────────────────────────╯

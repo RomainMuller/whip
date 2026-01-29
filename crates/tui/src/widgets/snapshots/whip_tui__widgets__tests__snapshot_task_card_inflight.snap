@@ -1,0 +1,9 @@
+---
+source: crates/whip-tui/src/widgets/tests.rs
+assertion_line: 153
+expression: buffer_to_string(&buf)
+---
+┌────────────────────┐
+│Active Task         │
+│Work in progress    │
+└────────────────────┘
