@@ -1,16 +1,16 @@
 [package]
 name = "whip"
 version = "0.0.1-dev"
-description = "An AI Agent orchestrator using Claude Code — it's not slavery since I'm paying for the tokens, right?"
 authors = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
+description = "An AI Agent orchestrator using Claude Code"
 
 [dependencies]
 anyhow = { workspace = true }
+tokio = { workspace = true }
 whip-protocol = { workspace = true }
 whip-tui = { workspace = true }
-tokio = { workspace = true }
 
 [workspace]
 resolver = "3"
@@ -30,20 +30,20 @@ serde_json = { version = "1.0" }
 tokio = { version = "1.43", features = ["full"] }
 
 # TUI
-ratatui = { version = "0.29" }
 crossterm = { version = "0.28" }
+ratatui = { version = "0.29" }
 
 # Error handling
-thiserror = { version = "2.0" }
 anyhow = { version = "1.0" }
+thiserror = { version = "2.0" }
 
 # Utilities
-uuid = { version = "1.11", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.11", features = ["v4", "serde"] }
 
 # Testing
-proptest = { version = "1.5" }
 insta = { version = "1.41" }
+proptest = { version = "1.5" }
 
 # Markdown parsing
 pulldown-cmark = { version = "0.12" }

@@ -1,10 +1,11 @@
-# whip — it's not slavery since I'm paying for the tokens, right?
+# whip
 
 A terminal UI application that supervises and orchestrates multiple Claude Code instances.
 
 ## Project Overview
 
-**whip** is a Rust-based TUI that acts as an "engineering manager" for AI coding agents, spawning and coordinating multiple Claude Code subprocesses to tackle complex, parallelizable work.
+**whip** is a Rust-based TUI that acts as an "engineering manager" for AI coding agents, spawning and coordinating
+multiple Claude Code subprocesses to tackle complex, parallelizable work.
 
 ## Architecture
 
@@ -21,15 +22,17 @@ whip/
 └── tests/             # Integration tests
 ```
 
+Nested crates are named `whip-*` but the directory name does not have the `whip-` prefix for simplicity.
+
 ### Crate Responsibilities
 
-| Crate | Purpose |
-|-------|---------|
-| `whip` (root) | CLI entrypoint, arg parsing, orchestration |
-| `whip-tui` | UI components, layout, input handling, rendering |
-| `whip-session` | Spawn/manage Claude Code processes, I/O streaming |
-| `whip-protocol` | Shared types (events, messages, errors) — no I/O |
-| `whip-config` | Config file parsing, defaults, validation |
+| Crate           | Purpose                                           |
+| --------------- | ------------------------------------------------- |
+| `whip` (root)   | CLI entrypoint, arg parsing, orchestration        |
+| `whip-tui`      | UI components, layout, input handling, rendering  |
+| `whip-session`  | Spawn/manage Claude Code processes, I/O streaming |
+| `whip-protocol` | Shared types (events, messages, errors) — no I/O  |
+| `whip-config`   | Config file parsing, defaults, validation         |
 
 ## Technology Stack
 
@@ -50,43 +53,43 @@ whip/
 ## Local state management
 
 - **Current plans**: stored in the `.localai/plans/` directory at crate root
-    - Plans are to be updated as implementation progresses so they stay up-to date
-    - Plans are presented as markdown documents; with a YAML front-matter providing high-level information on the intent
-    - Front-matter schema for plans:
-      ```yaml
-      ---
-      id: plan-NNN              # Unique identifier (e.g., plan-001)
-      title: Short Title        # Human-readable title
-      status: draft|approved|in_progress|completed|abandoned
-      created: YYYY-MM-DD       # Creation date
-      tags: [tag1, tag2]        # Categorization tags
-      priority: low|medium|high # Priority level
-      estimated_effort: small|medium|large|xlarge
-      ---
-      ```
+  - Plans are to be updated as implementation progresses so they stay up-to date
+  - Plans are presented as markdown documents; with a YAML front-matter providing high-level information on the intent
+  - Front-matter schema for plans:
+    ```yaml
+    ---
+    id: plan-NNN              # Unique identifier (e.g., plan-001)
+    title: Short Title        # Human-readable title
+    status: draft|approved|in_progress|completed|abandoned
+    created: YYYY-MM-DD       # Creation date
+    tags: [tag1, tag2]        # Categorization tags
+    priority: low|medium|high # Priority level
+    estimated_effort: small|medium|large|xlarge
+    ---
+    ```
 - **Detailed tasks**: stored in the `.localai/tasks/` directory at crate root
-    - Tasks are created from the plans, to fan out work to separate agents
-    - Tasks are presented as markdown documents; with a YAML front-matter linking it to the overarching plan
-    - They contain enough information for the separate agent to independently work on implementation
-    - Sub-agents are to update their assigned task as they progress, including marking sub-tasks as done, etc..
-    - Front-matter schema for tasks:
-      ```yaml
-      ---
-      id: task-NNN              # Unique identifier (e.g., task-001)
-      plan: plan-NNN            # Reference to parent plan
-      title: Short Title        # Human-readable title
-      status: pending|in_progress|completed|blocked
-      assigned_to: agent-type   # Which agent type handles this
-      created: YYYY-MM-DD       # Creation date
-      dependencies: [task-NNN]  # Tasks that must complete first
-      ---
-      ```
+  - Tasks are created from the plans, to fan out work to separate agents
+  - Tasks are presented as markdown documents; with a YAML front-matter linking it to the overarching plan
+  - They contain enough information for the separate agent to independently work on implementation
+  - Sub-agents are to update their assigned task as they progress, including marking sub-tasks as done, etc..
+  - Front-matter schema for tasks:
+    ```yaml
+    ---
+    id: task-NNN              # Unique identifier (e.g., task-001)
+    plan: plan-NNN            # Reference to parent plan
+    title: Short Title        # Human-readable title
+    status: pending|in_progress|completed|blocked
+    assigned_to: agent-type   # Which agent type handles this
+    created: YYYY-MM-DD       # Creation date
+    dependencies: [task-NNN]  # Tasks that must complete first
+    ---
+    ```
 - **Workspaces**: when spinning sub-agents to work concurrently on coding tasks, use the appropriate tool to manage
   (create/delete) workspaces in the `.localai/workspaces` directory at the crate root; ensuring you always:
-    - Retrofit the changes as individual commits into the root/default workspace once done
-    - Clean up (i.e, delete) the workspaces after they are no longer needed
-    - Have commits be siblings of each others unless the child depends on changes in the parent (introduce merge commits
-      using conventional commit to describe it)
+  - Retrofit the changes as individual commits into the root/default workspace once done
+  - Clean up (i.e, delete) the workspaces after they are no longer needed
+  - Have commits be siblings of each others unless the child depends on changes in the parent (introduce merge commits
+    using conventional commit to describe it)
 
 ## Code Style & Conventions
 
@@ -206,13 +209,16 @@ cargo insta review
 
 ## Dependencies Policy
 
-- **Workspace-level dependencies**: All dependencies must be declared in the root `Cargo.toml` under `[workspace.dependencies]`. Individual crates reference them via `dependency.workspace = true`.
-- **Version pinning**: Pin dependencies to at least the minor version (e.g., `"1.40"` not `"1"`) to ensure all required features are available and builds are reproducible.
+- **Workspace-level dependencies**: All dependencies must be declared in the root `Cargo.toml` under
+  `[workspace.dependencies]`. Individual crates reference them via `dependency.workspace = true`.
+- **Version pinning**: Pin dependencies to at least the minor version (e.g., `"1.40"` not `"1"`) to ensure all required
+  features are available and builds are reproducible.
 - Prefer well-maintained crates with > 1M downloads or strong ecosystem presence
 - Audit new dependencies for security and maintenance status
 - Use `cargo update` deliberately to bump versions
 
 Example in root `Cargo.toml`:
+
 ```toml
 [workspace.dependencies]
 tokio = { version = "1.40", features = ["full"] }
@@ -220,6 +226,7 @@ serde = { version = "1.0", features = ["derive"] }
 ```
 
 Example in crate `Cargo.toml`:
+
 ```toml
 [dependencies]
 tokio = { workspace = true }
