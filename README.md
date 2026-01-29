@@ -1,4 +1,4 @@
-# taim — Tame AI
+# whip — it's not slavery since I'm paying for the tokens, right?
 
 A terminal UI application that supervises and orchestrates multiple Claude Code instances.
 
@@ -8,7 +8,7 @@ A terminal UI application that supervises and orchestrates multiple Claude Code 
 
 ## Overview
 
-**taim** is a Rust-based TUI that acts as an "engineering manager" for AI coding agents, spawning and coordinating multiple Claude Code subprocesses to tackle complex, parallelizable work.
+**whip** is a Rust-based TUI that acts as an "engineering manager" for AI coding agents, spawning and coordinating multiple Claude Code subprocesses to tackle complex, parallelizable work.
 
 ## License
 

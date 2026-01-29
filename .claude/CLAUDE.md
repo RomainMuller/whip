@@ -81,11 +81,12 @@ taim/
       dependencies: [task-NNN]  # Tasks that must complete first
       ---
       ```
-- **Workspaces**: when spinning sub-agents to work concurrently on coding tasks, use the `jj` skill to manage workspaces
-  in the `.localai/workspaces` directory at the crate root
-    - Retrofit the changesets into the main/default workspace once done
-    - Clean up the workspaces after they are no longer needed
-    - Leverage the "megamerge" workflow as appropriate
+- **Workspaces**: when spinning sub-agents to work concurrently on coding tasks, use the appropriate tool to manage
+  (create/delete) workspaces in the `.localai/workspaces` directory at the crate root; ensuring you always:
+    - Retrofit the changes as individual commits into the root/default workspace once done
+    - Clean up (i.e, delete) the workspaces after they are no longer needed
+    - Have commits be siblings of each others unless the child depends on changes in the parent (introduce merge commits
+      using conventional commit to describe it)
 
 ## Code Style & Conventions
 

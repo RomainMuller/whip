@@ -1,7 +1,7 @@
 [package]
-name = "taim-tui"
+name = "whip-tui"
 version = "0.0.1-dev"
-description = "Terminal UI for taim - Ratatui-based Kanban board interface"
+description = "Terminal UI for whip - Ratatui-based Kanban board interface"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,7 +11,7 @@ anyhow = { workspace = true }
 crossterm = { workspace = true }
 pulldown-cmark = { workspace = true }
 ratatui = { workspace = true }
-taim-protocol = { workspace = true }
+whip-protocol = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 

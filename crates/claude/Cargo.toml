@@ -1,5 +1,5 @@
 [package]
-name = "taim-claude"
+name = "whip-claude"
 version = "0.0.1-dev"
 description = "A library to manage Claude Code sessions"
 authors.workspace = true
