@@ -77,6 +77,29 @@ impl TaskState {
     }
 }
 
+/// GitHub-specific metadata for a task sourced from GitHub Issues.
+///
+/// This contains all information needed to link a task back to its
+/// originating GitHub issue, including the repository, issue number,
+/// and supplementary information like labels and comment count.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GitHubSource {
+    /// Repository owner (e.g., "rust-lang").
+    pub owner: String,
+    /// Repository name (e.g., "rust").
+    pub repo: String,
+    /// Issue number.
+    pub number: u64,
+    /// Direct URL to the issue.
+    pub url: String,
+    /// Issue labels.
+    pub labels: Vec<String>,
+    /// Issue author login.
+    pub author: String,
+    /// Comment count (for future conversation rendering).
+    pub comment_count: u32,
+}
+
 /// A task on the Kanban board.
 ///
 /// Represents a unit of work that can be tracked through the board's lanes.
@@ -108,6 +131,9 @@ pub struct Task {
     pub created_at: DateTime<Utc>,
     /// When this task was last modified.
     pub updated_at: DateTime<Utc>,
+    /// GitHub source metadata if this task originated from GitHub Issues.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub github: Option<GitHubSource>,
 }
 
 impl Task {
@@ -135,6 +161,7 @@ impl Task {
             lane: LaneKind::Backlog,
             created_at: now,
             updated_at: now,
+            github: None,
         }
     }
 
@@ -162,6 +189,7 @@ impl Task {
             lane: LaneKind::Backlog,
             created_at: now,
             updated_at: now,
+            github: None,
         }
     }
 
@@ -245,15 +273,39 @@ mod proptest_tests {
     }
 
     prop_compose! {
+        fn arb_github_source()(
+            owner in "[a-zA-Z][a-zA-Z0-9-]{0,20}",
+            repo in "[a-zA-Z][a-zA-Z0-9-]{0,30}",
+            number in 1u64..100_000,
+            labels in prop::collection::vec("[a-zA-Z][a-zA-Z0-9-]{0,15}", 0..5),
+            author in "[a-zA-Z][a-zA-Z0-9]{0,20}",
+            comment_count in 0u32..1000,
+        ) -> GitHubSource {
+            let url = format!("https://github.com/{owner}/{repo}/issues/{number}");
+            GitHubSource {
+                owner,
+                repo,
+                number,
+                url,
+                labels,
+                author,
+                comment_count,
+            }
+        }
+    }
+
+    prop_compose! {
         fn arb_task()(
             title in "[a-zA-Z][a-zA-Z0-9 ]{0,50}",
             description in "[a-zA-Z0-9 .,!?]{0,200}",
             state in any::<TaskState>(),
             lane in any::<LaneKind>(),
+            github in prop::option::of(arb_github_source()),
         ) -> Task {
             let mut task = Task::new(title, description);
             task.state = state;
             task.lane = lane;
+            task.github = github;
             task
         }
     }
@@ -291,6 +343,22 @@ mod proptest_tests {
             prop_assert_eq!(json1, json2);
         }
 
+        /// Tests that GitHubSource serialization roundtrips correctly.
+        #[test]
+        fn github_source_roundtrip(source in arb_github_source()) {
+            let json = serde_json::to_string(&source).expect("serialize");
+            let parsed: GitHubSource = serde_json::from_str(&json).expect("deserialize");
+            prop_assert_eq!(source, parsed);
+        }
+
+        /// Tests that GitHubSource serialization is deterministic.
+        #[test]
+        fn github_source_serialization_is_deterministic(source in arb_github_source()) {
+            let json1 = serde_json::to_string(&source).expect("serialize 1");
+            let json2 = serde_json::to_string(&source).expect("serialize 2");
+            prop_assert_eq!(json1, json2);
+        }
+
         /// Tests that Task serialization roundtrips correctly, preserving all fields.
         #[test]
         fn task_roundtrip(task in arb_task()) {
@@ -304,6 +372,7 @@ mod proptest_tests {
             prop_assert_eq!(task.lane, parsed.lane);
             prop_assert_eq!(task.created_at, parsed.created_at);
             prop_assert_eq!(task.updated_at, parsed.updated_at);
+            prop_assert_eq!(task.github, parsed.github);
         }
 
         /// Tests that Task serialization is deterministic.
@@ -410,6 +479,66 @@ mod unit_tests {
         assert_eq!(task.description, parsed.description);
         assert_eq!(task.state, parsed.state);
         assert_eq!(task.lane, parsed.lane);
+        assert_eq!(task.github, parsed.github);
+    }
+
+    #[test]
+    fn task_without_github_omits_field_in_json() {
+        let task = Task::new("Test task", "A description");
+        let json = serde_json::to_string(&task).expect("serialize");
+
+        // The github field should not appear in the JSON when None
+        assert!(!json.contains("github"));
+    }
+
+    #[test]
+    fn task_with_github_includes_field_in_json() {
+        let mut task = Task::new("Test task", "A description");
+        task.github = Some(GitHubSource {
+            owner: "rust-lang".to_string(),
+            repo: "rust".to_string(),
+            number: 12345,
+            url: "https://github.com/rust-lang/rust/issues/12345".to_string(),
+            labels: vec!["bug".to_string(), "help wanted".to_string()],
+            author: "octocat".to_string(),
+            comment_count: 42,
+        });
+
+        let json = serde_json::to_string(&task).expect("serialize");
+        let parsed: Task = serde_json::from_str(&json).expect("deserialize");
+
+        // The github field should appear in the JSON
+        assert!(json.contains("github"));
+        assert!(json.contains("rust-lang"));
+        assert!(json.contains("12345"));
+
+        // Verify roundtrip preserves all GitHub metadata
+        let github = parsed.github.expect("github should be present");
+        assert_eq!(github.owner, "rust-lang");
+        assert_eq!(github.repo, "rust");
+        assert_eq!(github.number, 12345);
+        assert_eq!(github.url, "https://github.com/rust-lang/rust/issues/12345");
+        assert_eq!(github.labels, vec!["bug", "help wanted"]);
+        assert_eq!(github.author, "octocat");
+        assert_eq!(github.comment_count, 42);
+    }
+
+    #[test]
+    fn github_source_serialization_roundtrip() {
+        let source = GitHubSource {
+            owner: "owner".to_string(),
+            repo: "repo".to_string(),
+            number: 1,
+            url: "https://github.com/owner/repo/issues/1".to_string(),
+            labels: vec!["label1".to_string()],
+            author: "author".to_string(),
+            comment_count: 5,
+        };
+
+        let json = serde_json::to_string(&source).expect("serialize");
+        let parsed: GitHubSource = serde_json::from_str(&json).expect("deserialize");
+
+        assert_eq!(source, parsed);
     }
 
     #[test]
