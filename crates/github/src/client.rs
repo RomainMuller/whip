@@ -8,6 +8,7 @@ use secrecy::{ExposeSecret, SecretString};
 use tracing::{debug, instrument, warn};
 
 use crate::error::{Error, Result};
+use crate::issue::FetchOptions;
 
 /// GitHub API client with optional authentication.
 ///
@@ -196,6 +197,84 @@ impl GitHubClient {
     #[must_use]
     pub fn inner(&self) -> &Octocrab {
         &self.inner
+    }
+
+    /// Fetches issues from a GitHub repository.
+    ///
+    /// Retrieves issues matching the given filter options. By default, fetches
+    /// open issues with no label filter.
+    ///
+    /// # Arguments
+    ///
+    /// * `owner` - Repository owner (e.g., "rust-lang")
+    /// * `repo` - Repository name (e.g., "rust")
+    /// * `options` - Filtering and pagination options
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the API call fails, such as:
+    /// - Repository not found (404)
+    /// - Rate limit exceeded
+    /// - Network errors
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use whip_github::{GitHubClient, FetchOptions, IssueState};
+    ///
+    /// # async fn example() -> whip_github::Result<()> {
+    /// let client = GitHubClient::new(None).await?;
+    ///
+    /// // Fetch open issues with "bug" label
+    /// let options = FetchOptions {
+    ///     state: IssueState::Open,
+    ///     labels: vec!["bug".to_string()],
+    ///     per_page: 10,
+    /// };
+    ///
+    /// let issues = client.fetch_issues("rust-lang", "rust", &options).await?;
+    /// println!("Found {} issues", issues.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[instrument(skip(self, options), fields(owner = %owner, repo = %repo))]
+    pub async fn fetch_issues(
+        &self,
+        owner: &str,
+        repo: &str,
+        options: &FetchOptions,
+    ) -> Result<Vec<octocrab::models::issues::Issue>> {
+        debug!(
+            state = ?options.state,
+            labels = ?options.labels,
+            per_page = options.effective_per_page(),
+            "fetching issues"
+        );
+
+        let issues_handler = self.inner.issues(owner, repo);
+        let page = if options.labels.is_empty() {
+            issues_handler
+                .list()
+                .state(options.state.to_octocrab_state())
+                .per_page(options.effective_per_page())
+                .send()
+                .await
+                .map_err(Error::Api)?
+        } else {
+            issues_handler
+                .list()
+                .state(options.state.to_octocrab_state())
+                .per_page(options.effective_per_page())
+                .labels(&options.labels)
+                .send()
+                .await
+                .map_err(Error::Api)?
+        };
+
+        let issues: Vec<_> = page.items;
+        debug!(count = issues.len(), "fetched issues");
+
+        Ok(issues)
     }
 }
 
