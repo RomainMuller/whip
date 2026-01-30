@@ -44,11 +44,13 @@ async fn main() -> anyhow::Result<()> {
             RunResult::Quit => break,
             RunResult::RefreshRequested => {
                 // Force refresh from GitHub (bypass cache)
-                let board = refresh_github_board(&config).await.unwrap_or_else(|e| {
-                    // On error, keep the current board
-                    eprintln!("\rRefresh failed: {e}");
-                    KanbanBoard::new()
-                });
+                let board = refresh_github_board(app.config())
+                    .await
+                    .unwrap_or_else(|e| {
+                        // On error, keep the current board
+                        eprintln!("\rRefresh failed: {e}");
+                        KanbanBoard::new()
+                    });
                 app.set_board(board);
             }
         }
