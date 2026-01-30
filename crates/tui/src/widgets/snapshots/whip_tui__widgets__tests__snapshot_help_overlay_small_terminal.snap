@@ -15,6 +15,6 @@ expression: buffer_to_string(&buf)
   │  Enter      Open details        │
   │  Esc        Close panel         │
   │  Shift+S    Open settings       │
+  │  Ctrl+R     Refresh             │
   │  Ctrl+C     Quit                │
-  │  ?          Toggle help         │
   ╰─────────────────────────────────╯

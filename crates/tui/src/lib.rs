@@ -17,7 +17,7 @@
 //!
 //! ```no_run
 //! use whip_protocol::KanbanBoard;
-//! use whip_tui::{App, terminal};
+//! use whip_tui::{App, RunResult, terminal};
 //!
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
@@ -26,10 +26,18 @@
 //!
 //!     let board = KanbanBoard::new();
 //!     let mut app = App::new(board);
-//!     let result = app.run(&mut terminal).await;
+//!
+//!     loop {
+//!         match app.run(&mut terminal).await? {
+//!             RunResult::Quit => break,
+//!             RunResult::RefreshRequested => {
+//!                 // Handle refresh...
+//!             }
+//!         }
+//!     }
 //!
 //!     terminal::restore_terminal(&mut terminal)?;
-//!     result
+//!     Ok(())
 //! }
 //! ```
 
@@ -45,5 +53,5 @@ pub mod widgets;
 pub(crate) mod test_utils;
 
 // Re-export primary types at crate root for convenience
-pub use app::App;
+pub use app::{App, RunResult};
 pub use state::{AppState, Focus};

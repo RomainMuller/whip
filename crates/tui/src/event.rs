@@ -72,7 +72,7 @@ fn mouse_to_message(mouse: &crossterm::event::MouseEvent) -> Option<Message> {
 /// | `Down` | Navigate down |
 /// | `Enter` or `Space` | Select |
 /// | `Backspace` | Back |
-/// | `r` | Refresh |
+/// | `Ctrl+R` | Refresh |
 /// | `?` | Toggle help |
 /// | `Shift+S` | Open settings |
 #[must_use]
@@ -85,6 +85,11 @@ pub fn key_to_message(key: KeyEvent) -> Option<Message> {
     // Check for Shift+S to open settings
     if key.modifiers.contains(KeyModifiers::SHIFT) && key.code == KeyCode::Char('S') {
         return Some(Message::OpenSettings);
+    }
+
+    // Check for Ctrl+R to refresh
+    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('r') {
+        return Some(Message::Refresh);
     }
 
     // Regular keys
@@ -103,7 +108,6 @@ pub fn key_to_message(key: KeyEvent) -> Option<Message> {
         KeyCode::Backspace => Some(Message::Back),
 
         // Other actions
-        KeyCode::Char('r') => Some(Message::Refresh),
         KeyCode::Char('?') => Some(Message::ToggleHelp),
 
         _ => None,
@@ -271,12 +275,19 @@ mod tests {
     #[test]
     fn other_action_keys() {
         assert_eq!(
-            key_to_message(make_key(KeyCode::Char('r'))),
-            Some(Message::Refresh)
-        );
-        assert_eq!(
             key_to_message(make_key(KeyCode::Char('?'))),
             Some(Message::ToggleHelp)
+        );
+    }
+
+    #[test]
+    fn ctrl_r_refreshes() {
+        assert_eq!(
+            key_to_message(make_key_with_modifiers(
+                KeyCode::Char('r'),
+                KeyModifiers::CONTROL
+            )),
+            Some(Message::Refresh)
         );
     }
 

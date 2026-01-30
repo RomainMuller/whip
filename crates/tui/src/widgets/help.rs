@@ -15,7 +15,7 @@ use ratatui::{
 const HELP_WIDTH: u16 = 35;
 
 /// The height of the help overlay panel.
-const HELP_HEIGHT: u16 = 19;
+const HELP_HEIGHT: u16 = 20;
 
 /// Renders a centered help overlay displaying all keybindings.
 ///
@@ -41,6 +41,8 @@ const HELP_HEIGHT: u16 = 19;
 /// |  Actions                       |
 /// |  Enter      Open details       |
 /// |  Esc        Close panel        |
+/// |  Shift+S    Open settings      |
+/// |  Ctrl+R     Refresh            |
 /// |  Ctrl+C     Quit               |
 /// |  ?          Toggle help        |
 /// |                                |
@@ -131,6 +133,10 @@ fn build_help_lines() -> Vec<Line<'static>> {
         Line::from(vec![
             Span::styled("  Shift+S    ", key_style),
             Span::styled("Open settings", text_style),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+R     ", key_style),
+            Span::styled("Refresh", text_style),
         ]),
         Line::from(vec![
             Span::styled("  Ctrl+C     ", key_style),

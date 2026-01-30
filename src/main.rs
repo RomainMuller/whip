@@ -9,7 +9,7 @@ use whip_config::Config;
 use whip_config::auth::resolve_token;
 use whip_github::{CachedIssues, FetchOptions, GitHubClient, IssueCache, issue_to_task};
 use whip_protocol::KanbanBoard;
-use whip_tui::{App, terminal};
+use whip_tui::{App, RunResult, terminal};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -36,15 +36,30 @@ async fn main() -> anyhow::Result<()> {
     // Setup terminal
     let mut terminal = terminal::setup_terminal()?;
 
-    let mut app = App::with_config(board, config);
+    let mut app = App::with_config(board, config.clone());
 
-    // Run the main loop
-    let result = app.run(&mut terminal).await;
+    // Run the main loop, handling refresh requests
+    loop {
+        match app.run(&mut terminal).await? {
+            RunResult::Quit => break,
+            RunResult::RefreshRequested => {
+                // Force refresh from GitHub (bypass cache)
+                let board = refresh_github_board(app.config())
+                    .await
+                    .unwrap_or_else(|e| {
+                        // On error, keep the current board
+                        eprintln!("\rRefresh failed: {e}");
+                        KanbanBoard::new()
+                    });
+                app.set_board(board);
+            }
+        }
+    }
 
-    // Always restore terminal, even if app.run() failed
+    // Always restore terminal
     terminal::restore_terminal(&mut terminal)?;
 
-    result
+    Ok(())
 }
 
 /// Loads a KanbanBoard from GitHub issues.
@@ -126,6 +141,60 @@ async fn load_github_board(config: &Config) -> anyhow::Result<KanbanBoard> {
             }
             Err(e) => {
                 eprintln!("failed to create client: {e}");
+            }
+        }
+    }
+
+    Ok(board)
+}
+
+/// Force-refreshes issues from GitHub, bypassing the cache.
+///
+/// Used when the user explicitly requests a refresh (Ctrl+R).
+async fn refresh_github_board(config: &Config) -> anyhow::Result<KanbanBoard> {
+    let cache = IssueCache::new()?;
+    let mut board = KanbanBoard::new();
+
+    for repo in &config.repositories {
+        let owner = repo.owner();
+        let repo_name = repo.repo();
+
+        // Always fetch from GitHub, ignore cache
+        let token = resolve_token(repo, config.github_token.as_deref()).await;
+        let token = token.map(SecretString::from);
+
+        match GitHubClient::new(token).await {
+            Ok(client) => {
+                let options = FetchOptions::default();
+                match client.fetch_issues(owner, repo_name, &options).await {
+                    Ok(issues) => {
+                        let tasks: Vec<_> = issues
+                            .iter()
+                            .map(|issue| issue_to_task(issue, owner, repo_name))
+                            .collect();
+
+                        // Update cache
+                        let cached = CachedIssues::new(tasks.clone(), None);
+                        let _ = cache.save(owner, repo_name, &cached);
+
+                        for task in tasks {
+                            board.add_task(task);
+                        }
+                    }
+                    Err(e) => {
+                        // On refresh failure, try stale cache
+                        if let Ok(Some(cached)) = cache.load(owner, repo_name) {
+                            for task in cached.tasks {
+                                board.add_task(task);
+                            }
+                        } else {
+                            return Err(e.into());
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                return Err(e.into());
             }
         }
     }
