@@ -925,8 +925,10 @@ mod tests {
 
     #[test]
     fn can_delete_selected_authentication() {
-        let mut config = Config::default();
-        config.github_token = Some("test-token".to_string());
+        let config = Config {
+            github_token: Some("test-token".to_string()),
+            ..Default::default()
+        };
 
         let mut state = SettingsState::new(config);
 
