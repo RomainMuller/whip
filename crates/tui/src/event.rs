@@ -72,6 +72,7 @@ fn mouse_to_message(mouse: &crossterm::event::MouseEvent) -> Option<Message> {
 /// | `Down` | Navigate down |
 /// | `Enter` or `Space` | Select |
 /// | `Backspace` | Back |
+/// | `o` | Open in browser |
 /// | `Ctrl+R` | Refresh |
 /// | `?` | Toggle help |
 /// | `Shift+S` | Open settings |
@@ -108,6 +109,7 @@ pub fn key_to_message(key: KeyEvent) -> Option<Message> {
         KeyCode::Backspace => Some(Message::Back),
 
         // Other actions
+        KeyCode::Char('o') => Some(Message::OpenInBrowser),
         KeyCode::Char('?') => Some(Message::ToggleHelp),
 
         _ => None,

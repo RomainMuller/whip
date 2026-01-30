@@ -36,19 +36,42 @@ async fn main() -> anyhow::Result<()> {
     // Setup terminal
     let mut terminal = terminal::setup_terminal()?;
 
-    let mut app = App::with_config(board, config.clone());
+    let mut app = App::with_config(board, config);
 
     // Run the main loop, handling refresh requests
     loop {
         match app.run(&mut terminal).await? {
             RunResult::Quit => break,
             RunResult::RefreshRequested => {
-                // Force refresh from GitHub (bypass cache)
-                let board = refresh_github_board(&config).await.unwrap_or_else(|e| {
-                    // On error, keep the current board
-                    eprintln!("\rRefresh failed: {e}");
-                    KanbanBoard::new()
-                });
+                // Show loading indicator
+                terminal.draw(|frame| {
+                    app.view(frame);
+                    // Draw a loading message at the bottom
+                    let area = frame.area();
+                    let loading_area = ratatui::layout::Rect {
+                        x: 0,
+                        y: area.height.saturating_sub(1),
+                        width: area.width,
+                        height: 1,
+                    };
+                    let loading = ratatui::widgets::Paragraph::new(" Refreshing GitHub issues...")
+                        .style(
+                            ratatui::style::Style::default()
+                                .fg(ratatui::style::Color::Yellow)
+                                .add_modifier(ratatui::style::Modifier::BOLD),
+                        );
+                    frame.render_widget(loading, loading_area);
+                })?;
+
+                // Force refresh from GitHub (bypass cache) using the CURRENT config
+                let current_config = app.config();
+                let board = refresh_github_board(current_config)
+                    .await
+                    .unwrap_or_else(|e| {
+                        // On error, keep the current board
+                        eprintln!("\rRefresh failed: {e}");
+                        KanbanBoard::new()
+                    });
                 app.set_board(board);
             }
         }

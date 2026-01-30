@@ -22,8 +22,8 @@ use crate::{
     settings_state::SettingsState,
     terminal::AppTerminal,
     widgets::{
-        description_area_dimensions, max_scroll_offset, render_board, render_detail_panel,
-        render_help_overlay, render_settings_panel,
+        calculate_metadata_height, description_area_dimensions, max_scroll_offset, render_board,
+        render_detail_panel, render_help_overlay, render_settings_panel,
     },
 };
 
@@ -36,10 +36,27 @@ pub enum RunResult {
     RefreshRequested,
 }
 
+/// Function type for opening URLs in a browser.
+pub type BrowserOpener = fn(&str) -> std::io::Result<()>;
+
+/// Function type for saving configuration to disk.
+pub type ConfigSaver = fn(&Config) -> anyhow::Result<()>;
+
+/// Default browser opener that uses the system's default browser.
+fn default_browser_opener(url: &str) -> std::io::Result<()> {
+    open::that(url)
+}
+
+/// Default config saver that writes to the user's config file.
+fn default_config_saver(config: &Config) -> anyhow::Result<()> {
+    let path = whip_config::persistence::default_user_config_path()?;
+    config.save_to(&path)?;
+    Ok(())
+}
+
 /// The main application struct.
 ///
 /// Manages the application state and provides the main event loop.
-#[derive(Debug)]
 pub struct App {
     state: AppState,
     should_quit: bool,
@@ -53,6 +70,10 @@ pub struct App {
     settings_state: Option<SettingsState>,
     /// The application configuration.
     config: Config,
+    /// Function to open URLs in a browser (injectable for testing).
+    browser_opener: BrowserOpener,
+    /// Function to save config to disk (injectable for testing).
+    config_saver: ConfigSaver,
 }
 
 impl App {
@@ -81,6 +102,8 @@ impl App {
             header_visible: true,
             settings_state: None,
             config: Config::default(),
+            browser_opener: default_browser_opener,
+            config_saver: default_config_saver,
         }
     }
 
@@ -112,7 +135,29 @@ impl App {
             header_visible: true,
             settings_state: None,
             config,
+            browser_opener: default_browser_opener,
+            config_saver: default_config_saver,
         }
+    }
+
+    /// Sets a custom browser opener function.
+    ///
+    /// This is primarily useful for testing to verify that URLs are opened correctly
+    /// without actually launching a browser.
+    #[must_use]
+    pub fn with_browser_opener(mut self, opener: BrowserOpener) -> Self {
+        self.browser_opener = opener;
+        self
+    }
+
+    /// Sets a custom config saver function.
+    ///
+    /// This is primarily useful for testing to verify that config is saved correctly
+    /// without writing to the user's actual config file.
+    #[must_use]
+    pub fn with_config_saver(mut self, saver: ConfigSaver) -> Self {
+        self.config_saver = saver;
+        self
     }
 
     /// Returns a reference to the application state.
@@ -161,10 +206,8 @@ impl App {
                     // Close settings and save changes
                     if let Some(settings) = self.settings_state.take() {
                         self.config = settings.into_config();
-                        // Save to disk
-                        if let Ok(path) = whip_config::persistence::default_user_config_path() {
-                            let _ = self.config.save_to(&path);
-                        }
+                        // Save to disk using the injected saver
+                        let _ = (self.config_saver)(&self.config);
                     }
                     self.state.focus = Focus::Board;
                 }
@@ -307,6 +350,9 @@ impl App {
             Message::Refresh => {
                 self.refresh_requested = true;
             }
+            Message::OpenInBrowser => {
+                self.open_selected_in_browser();
+            }
             Message::ClickAt { column, row } => {
                 self.handle_click(column, row);
             }
@@ -317,10 +363,18 @@ impl App {
 
     /// Handles a mouse click at the given coordinates.
     ///
-    /// If the click is on a task card, selects that task and opens the detail view.
+    /// Behavior depends on context:
+    /// - In detail view: clicking on the metadata area (where GitHub link is) opens browser
+    /// - On board: clicking on a task card selects it and opens detail view
     fn handle_click(&mut self, column: u16, row: u16) {
-        // Only handle clicks when on the board view
-        if self.state.focus != Focus::Board || self.state.detail_visible {
+        // Handle clicks in detail view
+        if self.state.detail_visible {
+            self.handle_detail_click(column, row);
+            return;
+        }
+
+        // Only handle board clicks when on board focus
+        if self.state.focus != Focus::Board {
             return;
         }
 
@@ -365,6 +419,70 @@ impl App {
             self.state.selected_task = Some(task_idx);
             // Open detail view
             self.state.toggle_detail();
+        }
+    }
+
+    /// Opens the currently selected task's GitHub URL in the default browser.
+    ///
+    /// Does nothing if no task is selected or if the task has no GitHub source.
+    /// Uses the injected `browser_opener` function, which can be customized for testing.
+    fn open_selected_in_browser(&self) {
+        let Some(task) = self.state.selected_task() else {
+            return;
+        };
+        let Some(github) = &task.github else {
+            return;
+        };
+        // Ignore errors - nothing useful we can do if browser fails to open
+        let _ = (self.browser_opener)(&github.url);
+    }
+
+    /// Handles clicks in the detail view.
+    ///
+    /// Clicking on the metadata area (where the GitHub link is displayed) opens
+    /// the issue in the browser.
+    fn handle_detail_click(&mut self, _column: u16, row: u16) {
+        let Some(task) = self.state.selected_task() else {
+            return;
+        };
+
+        // Only handle clicks if task has GitHub source
+        if task.github.is_none() {
+            return;
+        }
+
+        // Calculate the metadata area bounds
+        // The detail panel has:
+        // - Border top (1 row)
+        // - Metadata (dynamic height based on terminal width)
+        // - Separator (1 row)
+        // - Description (flex)
+        // - Separator (1 row)
+        // - Footer (1 row)
+        // - Border bottom (1 row)
+
+        let header_offset = if self.header_visible {
+            HEADER_HEIGHT
+        } else {
+            0
+        };
+
+        // Panel starts after header
+        let panel_y = self.last_area.y + header_offset;
+
+        // Border is 1 row, so metadata starts at panel_y + 1
+        let metadata_start = panel_y + 1;
+
+        // Calculate metadata height based on inner width (panel width minus borders)
+        let inner_width = self.last_area.width.saturating_sub(2);
+        let metadata_height = calculate_metadata_height(task, inner_width);
+
+        // Metadata ends at metadata_start + metadata_height
+        let metadata_end = metadata_start + metadata_height;
+
+        // Check if click is within the metadata area
+        if row >= metadata_start && row < metadata_end {
+            self.open_selected_in_browser();
         }
     }
 
@@ -629,11 +747,70 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
+
+    // Thread-local storage to track browser opener calls
+    thread_local! {
+        static BROWSER_OPENED_URLS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+        static CONFIG_SAVE_COUNT: RefCell<usize> = const { RefCell::new(0) };
+    }
+
+    /// Mock browser opener that records URLs instead of opening them.
+    fn mock_browser_opener(url: &str) -> std::io::Result<()> {
+        BROWSER_OPENED_URLS.with(|urls| urls.borrow_mut().push(url.to_string()));
+        Ok(())
+    }
+
+    /// Mock config saver that counts saves instead of writing to disk.
+    fn mock_config_saver(_config: &Config) -> anyhow::Result<()> {
+        CONFIG_SAVE_COUNT.with(|count| *count.borrow_mut() += 1);
+        Ok(())
+    }
+
+    /// No-op browser opener for tests that don't care about browser calls.
+    fn noop_browser_opener(_url: &str) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    /// No-op config saver for tests that don't care about config saving.
+    fn noop_config_saver(_config: &Config) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    /// Helper to create an App with no-op side effects for most tests.
+    fn test_app(board: KanbanBoard) -> App {
+        App::new(board)
+            .with_browser_opener(noop_browser_opener)
+            .with_config_saver(noop_config_saver)
+    }
+
+    /// Helper to create an App with config for tests.
+    fn test_app_with_config(board: KanbanBoard, config: Config) -> App {
+        App::with_config(board, config)
+            .with_browser_opener(noop_browser_opener)
+            .with_config_saver(noop_config_saver)
+    }
+
+    /// Clears the mock state before a test.
+    fn clear_mocks() {
+        BROWSER_OPENED_URLS.with(|urls| urls.borrow_mut().clear());
+        CONFIG_SAVE_COUNT.with(|count| *count.borrow_mut() = 0);
+    }
+
+    /// Gets the URLs that were "opened" by the mock browser opener.
+    fn get_opened_urls() -> Vec<String> {
+        BROWSER_OPENED_URLS.with(|urls| urls.borrow().clone())
+    }
+
+    /// Gets the number of times config was "saved" by the mock saver.
+    fn get_config_save_count() -> usize {
+        CONFIG_SAVE_COUNT.with(|count| *count.borrow())
+    }
 
     #[test]
     fn app_new_creates_with_board() {
         let board = KanbanBoard::new();
-        let app = App::new(board);
+        let app = test_app(board);
 
         assert!(!app.should_quit);
         assert_eq!(app.state.selected_lane, 0);
@@ -642,7 +819,7 @@ mod tests {
     #[test]
     fn app_quit_message_sets_should_quit() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         assert!(!app.should_quit);
         app.update(Message::Quit);
@@ -652,7 +829,7 @@ mod tests {
     #[test]
     fn app_navigation_updates_state() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         app.update(Message::NavigateRight);
         assert_eq!(app.state.selected_lane, 1);
@@ -664,7 +841,7 @@ mod tests {
     #[test]
     fn app_select_does_nothing_without_task() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         assert!(!app.state.detail_visible);
         app.update(Message::Select);
@@ -677,7 +854,7 @@ mod tests {
         let mut board = KanbanBoard::new();
         board.add_task(whip_protocol::Task::new("Task 1", "Description"));
 
-        let mut app = App::new(board);
+        let mut app = test_app(board);
         app.update(Message::NavigateDown); // Select the task
 
         assert!(!app.state.detail_visible);
@@ -691,7 +868,7 @@ mod tests {
     #[test]
     fn app_toggle_help_shows_and_hides() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         assert!(!app.state.help_visible);
 
@@ -705,7 +882,7 @@ mod tests {
     #[test]
     fn app_help_dismisses_on_any_key() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         // Show help
         app.update(Message::ToggleHelp);
@@ -719,7 +896,7 @@ mod tests {
     #[test]
     fn app_help_blocks_navigation() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         // Start at lane 0
         assert_eq!(app.state.selected_lane, 0);
@@ -736,7 +913,7 @@ mod tests {
     #[test]
     fn app_quit_works_with_help_visible() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         app.update(Message::ToggleHelp);
         assert!(app.state.help_visible);
@@ -750,7 +927,7 @@ mod tests {
         let mut board = KanbanBoard::new();
         board.add_task(whip_protocol::Task::new("Task 1", "Description"));
 
-        let mut app = App::new(board);
+        let mut app = test_app(board);
         app.update(Message::NavigateDown); // Select a task
         app.update(Message::Select); // Open detail panel
         assert!(app.state.detail_visible);
@@ -765,7 +942,7 @@ mod tests {
         let mut board = KanbanBoard::new();
         board.add_task(whip_protocol::Task::new("Task 1", "Description"));
 
-        let mut app = App::new(board);
+        let mut app = test_app(board);
         app.update(Message::NavigateDown); // Select a task
         assert!(app.state.selected_task.is_some());
 
@@ -777,7 +954,7 @@ mod tests {
     #[test]
     fn app_escape_dismisses_help() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         app.update(Message::ToggleHelp);
         assert!(app.state.help_visible);
@@ -792,7 +969,7 @@ mod tests {
         let mut board = KanbanBoard::new();
         board.add_task(whip_protocol::Task::new("Task 1", "Description"));
 
-        let mut app = App::new(board);
+        let mut app = test_app(board);
         // Simulate having rendered with a known area
         app.last_area = Rect::new(0, 0, 80, 24);
 
@@ -816,7 +993,7 @@ mod tests {
             whip_protocol::LaneKind::UnderReview,
         );
 
-        let mut app = App::new(board);
+        let mut app = test_app(board);
         app.last_area = Rect::new(0, 0, 80, 24);
 
         // Click on lane 2 (columns 40-59 for 80-wide terminal)
@@ -830,7 +1007,7 @@ mod tests {
     #[test]
     fn app_click_on_empty_lane_does_nothing() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
         app.last_area = Rect::new(0, 0, 80, 24);
 
         app.update(Message::ClickAt { column: 5, row: 4 });
@@ -843,7 +1020,7 @@ mod tests {
         let mut board = KanbanBoard::new();
         board.add_task(whip_protocol::Task::new("Task 1", "Description"));
 
-        let mut app = App::new(board);
+        let mut app = test_app(board);
         app.last_area = Rect::new(0, 0, 80, 24);
 
         // Click on header (row 0-2)
@@ -858,7 +1035,7 @@ mod tests {
         board.add_task(whip_protocol::Task::new("Task 1", "Description"));
         board.add_task(whip_protocol::Task::new("Task 2", "Description"));
 
-        let mut app = App::new(board);
+        let mut app = test_app(board);
         app.last_area = Rect::new(0, 0, 80, 24);
 
         // Open detail on first task
@@ -878,7 +1055,7 @@ mod tests {
         // Create a task with a short description that won't require scrolling
         board.add_task(whip_protocol::Task::new("Task 1", "Short description"));
 
-        let mut app = App::new(board);
+        let mut app = test_app(board);
         // Simulate a reasonably sized terminal
         app.last_area = Rect::new(0, 0, 80, 24);
 
@@ -908,7 +1085,7 @@ mod tests {
         let long_description = "This is a very long description. ".repeat(50);
         board.add_task(whip_protocol::Task::new("Task 1", &long_description));
 
-        let mut app = App::new(board);
+        let mut app = test_app(board);
         // Simulate a reasonably sized terminal
         app.last_area = Rect::new(0, 0, 80, 24);
 
@@ -950,7 +1127,7 @@ mod tests {
         use ratatui::backend::TestBackend;
 
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         // Create a terminal with height below MIN_HEIGHT (10)
         let backend = TestBackend::new(80, 8);
@@ -981,7 +1158,7 @@ mod tests {
         use ratatui::backend::TestBackend;
 
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         // Create a terminal with width below MIN_WIDTH (40)
         let backend = TestBackend::new(30, 24);
@@ -1010,7 +1187,7 @@ mod tests {
         use ratatui::backend::TestBackend;
 
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         // Create a terminal with height at MIN_HEIGHT but below MIN_HEIGHT_WITH_HEADER
         // MIN_HEIGHT = 10, MIN_HEIGHT_WITH_HEADER = 13
@@ -1042,7 +1219,7 @@ mod tests {
         use ratatui::backend::TestBackend;
 
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         // Create a terminal with height at or above MIN_HEIGHT_WITH_HEADER (13)
         let backend = TestBackend::new(80, 15);
@@ -1076,7 +1253,7 @@ mod tests {
         let mut board = KanbanBoard::new();
         board.add_task(whip_protocol::Task::new("Task 1", "Description"));
 
-        let mut app = App::new(board);
+        let mut app = test_app(board);
         // Simulate compact mode (header not visible, height between MIN_HEIGHT and MIN_HEIGHT_WITH_HEADER)
         app.last_area = Rect::new(0, 0, 80, 11);
         app.header_visible = false;
@@ -1098,7 +1275,7 @@ mod tests {
         let mut board = KanbanBoard::new();
         board.add_task(whip_protocol::Task::new("My Test Task", "Task description"));
 
-        let mut app = App::new(board);
+        let mut app = test_app(board);
         // Select task and open detail
         app.update(Message::NavigateDown);
         app.update(Message::Select);
@@ -1136,7 +1313,7 @@ mod tests {
     #[test]
     fn app_open_settings() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         assert!(!app.is_settings_open());
 
@@ -1148,7 +1325,7 @@ mod tests {
     #[test]
     fn app_close_settings() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         app.update(Message::OpenSettings);
         assert!(app.is_settings_open());
@@ -1161,7 +1338,7 @@ mod tests {
     #[test]
     fn app_settings_navigation() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         app.update(Message::OpenSettings);
 
@@ -1186,7 +1363,7 @@ mod tests {
     #[test]
     fn app_settings_escape_closes() {
         let board = KanbanBoard::new();
-        let mut app = App::new(board);
+        let mut app = test_app(board);
 
         app.update(Message::OpenSettings);
         assert!(app.is_settings_open());
@@ -1203,7 +1380,7 @@ mod tests {
             ..Default::default()
         };
 
-        let app = App::with_config(board, config);
+        let app = test_app_with_config(board, config);
         assert_eq!(app.config().github_token, Some("test_token".to_string()));
     }
 
@@ -1211,11 +1388,15 @@ mod tests {
     fn app_settings_preserves_config_on_close() {
         use whip_config::Repository;
 
+        clear_mocks();
+
         let board = KanbanBoard::new();
         let mut config = Config::default();
         config.repositories.push(Repository::new("owner", "repo"));
 
-        let mut app = App::with_config(board, config);
+        let mut app = App::with_config(board, config)
+            .with_browser_opener(noop_browser_opener)
+            .with_config_saver(mock_config_saver);
 
         // Open settings, make a change, close
         app.update(Message::OpenSettings);
@@ -1229,7 +1410,172 @@ mod tests {
         // Close settings
         app.update(Message::CloseSettings);
 
-        // Config should be updated
+        // Config should be updated in memory
         assert!(app.config().repositories.is_empty());
+
+        // Verify that config_saver was called
+        assert_eq!(
+            get_config_save_count(),
+            1,
+            "Config should have been saved once when settings were closed"
+        );
+    }
+
+    #[test]
+    fn app_detail_click_with_github_task_opens_browser() {
+        clear_mocks();
+
+        let mut board = KanbanBoard::new();
+        let mut task = whip_protocol::Task::new("Task 1", "Description");
+        task.github = Some(whip_protocol::GitHubSource {
+            owner: "owner".to_string(),
+            repo: "repo".to_string(),
+            number: 123,
+            url: "https://github.com/owner/repo/issues/123".to_string(),
+            labels: vec![],
+            author: "author".to_string(),
+            comment_count: 0,
+        });
+        board.add_task(task);
+
+        let mut app = App::new(board)
+            .with_browser_opener(mock_browser_opener)
+            .with_config_saver(noop_config_saver);
+        app.last_area = Rect::new(0, 0, 80, 24);
+
+        // Select task and open detail
+        app.update(Message::NavigateDown);
+        app.update(Message::Select);
+        assert!(app.state.detail_visible);
+
+        // Click on the metadata area (row 4 is in the metadata section after header + border)
+        // Header is 3 rows, border is 1 row, so metadata starts at row 4
+        app.update(Message::ClickAt { column: 40, row: 4 });
+
+        // Verify browser was opened with the correct URL
+        let urls = get_opened_urls();
+        assert_eq!(
+            urls,
+            vec!["https://github.com/owner/repo/issues/123"],
+            "Browser should have been opened with the GitHub issue URL"
+        );
+
+        // State should be preserved
+        assert!(app.state.detail_visible);
+        assert_eq!(app.state.selected_task, Some(0));
+    }
+
+    #[test]
+    fn app_detail_click_without_github_does_not_open_browser() {
+        clear_mocks();
+
+        let mut board = KanbanBoard::new();
+        board.add_task(whip_protocol::Task::new("Task 1", "Description"));
+
+        let mut app = App::new(board)
+            .with_browser_opener(mock_browser_opener)
+            .with_config_saver(noop_config_saver);
+        app.last_area = Rect::new(0, 0, 80, 24);
+
+        // Select task and open detail
+        app.update(Message::NavigateDown);
+        app.update(Message::Select);
+        assert!(app.state.detail_visible);
+
+        // Click on metadata area - should be a no-op since no GitHub source
+        app.update(Message::ClickAt { column: 40, row: 4 });
+
+        // Verify browser was NOT opened
+        let urls = get_opened_urls();
+        assert!(
+            urls.is_empty(),
+            "Browser should not have been opened for task without GitHub source"
+        );
+
+        // State should be preserved
+        assert!(app.state.detail_visible);
+        assert_eq!(app.state.selected_task, Some(0));
+    }
+
+    #[test]
+    fn app_detail_click_outside_metadata_does_not_open_browser() {
+        clear_mocks();
+
+        let mut board = KanbanBoard::new();
+        let mut task = whip_protocol::Task::new("Task 1", "Description");
+        task.github = Some(whip_protocol::GitHubSource {
+            owner: "owner".to_string(),
+            repo: "repo".to_string(),
+            number: 123,
+            url: "https://github.com/owner/repo/issues/123".to_string(),
+            labels: vec![],
+            author: "author".to_string(),
+            comment_count: 0,
+        });
+        board.add_task(task);
+
+        let mut app = App::new(board)
+            .with_browser_opener(mock_browser_opener)
+            .with_config_saver(noop_config_saver);
+        app.last_area = Rect::new(0, 0, 80, 24);
+
+        // Select task and open detail
+        app.update(Message::NavigateDown);
+        app.update(Message::Select);
+        assert!(app.state.detail_visible);
+
+        // Click on the description area (row 10 is well past the metadata section)
+        // This should NOT trigger open_selected_in_browser
+        app.update(Message::ClickAt {
+            column: 40,
+            row: 10,
+        });
+
+        // Verify browser was NOT opened
+        let urls = get_opened_urls();
+        assert!(
+            urls.is_empty(),
+            "Browser should not have been opened for click outside metadata area"
+        );
+
+        // State should be preserved
+        assert!(app.state.detail_visible);
+        assert_eq!(app.state.selected_task, Some(0));
+    }
+
+    #[test]
+    fn app_open_in_browser_key_opens_correct_url() {
+        clear_mocks();
+
+        let mut board = KanbanBoard::new();
+        let mut task = whip_protocol::Task::new("Task 1", "Description");
+        task.github = Some(whip_protocol::GitHubSource {
+            owner: "rust-lang".to_string(),
+            repo: "rust".to_string(),
+            number: 12345,
+            url: "https://github.com/rust-lang/rust/issues/12345".to_string(),
+            labels: vec![],
+            author: "author".to_string(),
+            comment_count: 0,
+        });
+        board.add_task(task);
+
+        let mut app = App::new(board)
+            .with_browser_opener(mock_browser_opener)
+            .with_config_saver(noop_config_saver);
+
+        // Select task
+        app.update(Message::NavigateDown);
+
+        // Press 'o' to open in browser
+        app.update(Message::OpenInBrowser);
+
+        // Verify browser was opened with the correct URL
+        let urls = get_opened_urls();
+        assert_eq!(
+            urls,
+            vec!["https://github.com/rust-lang/rust/issues/12345"],
+            "Browser should have been opened with the GitHub issue URL when 'o' is pressed"
+        );
     }
 }
