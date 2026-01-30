@@ -1094,4 +1094,229 @@ mod tests {
         state.move_cursor_right();
         assert_eq!(state.edit_mode().cursor(), Some(4));
     }
+
+    #[test]
+    fn edit_mode_backspace_at_cursor_zero() {
+        // Test backspace when cursor is already at position 0 - should do nothing
+        let mut edit = EditMode::Text {
+            value: "hello".to_string(),
+            cursor: 0,
+        };
+
+        edit.backspace();
+        assert_eq!(edit.value(), Some("hello")); // Value unchanged
+        assert_eq!(edit.cursor(), Some(0)); // Cursor unchanged
+
+        // Also test with empty string
+        let mut edit_empty = EditMode::Text {
+            value: String::new(),
+            cursor: 0,
+        };
+
+        edit_empty.backspace();
+        assert_eq!(edit_empty.value(), Some(""));
+        assert_eq!(edit_empty.cursor(), Some(0));
+
+        // Test in AddRepository mode
+        let mut edit_add = EditMode::AddRepository {
+            value: "test".to_string(),
+            cursor: 0,
+        };
+
+        edit_add.backspace();
+        assert_eq!(edit_add.value(), Some("test"));
+        assert_eq!(edit_add.cursor(), Some(0));
+
+        // Test in EditRepository mode with path field active
+        let mut edit_repo = EditMode::EditRepository {
+            index: 0,
+            path: "owner/repo".to_string(),
+            path_cursor: 0,
+            token: "secret".to_string(),
+            token_cursor: 6,
+            active_field: RepoEditField::Path,
+        };
+
+        edit_repo.backspace();
+        assert_eq!(edit_repo.value(), Some("owner/repo")); // Path unchanged
+        assert_eq!(edit_repo.cursor(), Some(0));
+
+        // Switch to token field and test backspace at cursor 0
+        edit_repo.switch_field();
+        if let EditMode::EditRepository { token_cursor, .. } = &mut edit_repo {
+            *token_cursor = 0;
+        }
+        edit_repo.backspace();
+        assert_eq!(edit_repo.value(), Some("secret")); // Token unchanged
+    }
+
+    #[test]
+    fn edit_mode_switch_field_not_in_edit_repository() {
+        // switch_field should do nothing when not in EditRepository mode
+        let mut edit_none = EditMode::None;
+        edit_none.switch_field();
+        assert_eq!(edit_none, EditMode::None);
+
+        let mut edit_text = EditMode::Text {
+            value: "test".to_string(),
+            cursor: 4,
+        };
+        edit_text.switch_field();
+        assert_eq!(
+            edit_text,
+            EditMode::Text {
+                value: "test".to_string(),
+                cursor: 4
+            }
+        );
+
+        let mut edit_add = EditMode::AddRepository {
+            value: "owner/repo".to_string(),
+            cursor: 10,
+        };
+        edit_add.switch_field();
+        assert_eq!(
+            edit_add,
+            EditMode::AddRepository {
+                value: "owner/repo".to_string(),
+                cursor: 10
+            }
+        );
+    }
+
+    #[test]
+    fn edit_mode_repo_methods_return_none_outside_edit_repository() {
+        // Both active_repo_field and repo_edit_data should return None
+        // for modes other than EditRepository
+        let modes = [
+            EditMode::None,
+            EditMode::Text {
+                value: "test".to_string(),
+                cursor: 4,
+            },
+            EditMode::AddRepository {
+                value: "owner/repo".to_string(),
+                cursor: 10,
+            },
+        ];
+
+        for mode in &modes {
+            assert_eq!(mode.active_repo_field(), None);
+            assert_eq!(mode.repo_edit_data(), None);
+        }
+    }
+
+    #[test]
+    fn edit_mode_repo_edit_data_returns_fields() {
+        let edit = EditMode::EditRepository {
+            index: 0,
+            path: "owner/repo".to_string(),
+            path_cursor: 10,
+            token: "my-token".to_string(),
+            token_cursor: 8,
+            active_field: RepoEditField::Path,
+        };
+
+        let (path, token, field) = edit.repo_edit_data().expect("should return data");
+        assert_eq!(path, "owner/repo");
+        assert_eq!(token, "my-token");
+        assert_eq!(field, RepoEditField::Path);
+        assert_eq!(edit.active_repo_field(), Some(RepoEditField::Path));
+    }
+
+    #[test]
+    fn settings_state_confirm_delete_no_pending() {
+        // confirm_delete should return false when there's no pending delete
+        let mut config = Config::default();
+        config.repositories.push(Repository::new("owner", "repo"));
+
+        let mut state = SettingsState::new(config);
+
+        // Without calling request_delete first
+        assert!(!state.confirm_delete());
+        // Repository should still be there
+        assert_eq!(state.config().repositories.len(), 1);
+    }
+
+    #[test]
+    fn settings_state_confirm_delete_index_out_of_bounds() {
+        // confirm_delete should return false if the pending index is out of bounds
+        let mut config = Config::default();
+        config.repositories.push(Repository::new("owner", "repo"));
+
+        let mut state = SettingsState::new(config);
+
+        // Request delete for valid item
+        assert!(state.request_delete());
+
+        // Manually remove the repository to make the pending index invalid
+        state.config_mut().repositories.clear();
+
+        // Now confirm_delete should fail because index is out of bounds
+        assert!(!state.confirm_delete());
+    }
+
+    #[test]
+    fn settings_state_request_delete_non_repository_sections() {
+        let config = Config::default();
+        let mut state = SettingsState::new(config);
+
+        // Go to Polling section
+        state.next_section();
+        assert_eq!(state.section(), SettingsSection::Polling);
+
+        // request_delete should return false in Polling section
+        assert!(!state.request_delete());
+        assert!(!state.is_delete_pending());
+
+        // Go to Authentication section
+        state.next_section();
+        assert_eq!(state.section(), SettingsSection::Authentication);
+
+        // request_delete should return false in Authentication section
+        assert!(!state.request_delete());
+        assert!(!state.is_delete_pending());
+    }
+
+    #[test]
+    fn settings_state_request_delete_add_repository_item() {
+        // request_delete should return false when on "Add repository..." item
+        let config = Config::default();
+        let mut state = SettingsState::new(config);
+
+        // With no repositories, selected_item 0 is the "Add repository..." item
+        assert!(!state.request_delete());
+        assert!(!state.is_delete_pending());
+    }
+
+    #[test]
+    fn edit_mode_none_is_inert() {
+        // EditMode::None should be completely inert - all operations are no-ops
+        let mut edit = EditMode::None;
+
+        // Accessors return None/false
+        assert_eq!(edit.value(), None);
+        assert_eq!(edit.cursor(), None);
+        assert!(!edit.is_editing());
+
+        // Mutations do nothing
+        edit.backspace();
+        assert_eq!(edit, EditMode::None);
+
+        edit.insert_char('x');
+        assert_eq!(edit, EditMode::None);
+
+        edit.move_cursor_left();
+        assert_eq!(edit, EditMode::None);
+
+        edit.move_cursor_right();
+        assert_eq!(edit, EditMode::None);
+    }
+
+    #[test]
+    fn repo_edit_field_next() {
+        let field = RepoEditField::Path;
+        assert_eq!(field.next(), RepoEditField::Token);
+        assert_eq!(field.next().next(), RepoEditField::Path);
+    }
 }

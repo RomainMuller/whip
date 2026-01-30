@@ -304,4 +304,28 @@ mod tests {
             assert!(result.unwrap().ends_with(USER_CONFIG_DIR));
         }
     }
+
+    #[test]
+    fn default_user_config_path_structure() {
+        // Skip if no home directory (e.g., in some CI environments)
+        let Some(_) = dirs::config_dir() else {
+            return;
+        };
+
+        let path = default_user_config_path().expect("should return path when config_dir exists");
+
+        assert!(
+            path.ends_with("config.json5"),
+            "Expected path to end with 'config.json5', got: {}",
+            path.display()
+        );
+
+        let path_str = path.to_string_lossy();
+        assert!(
+            path_str.contains(USER_CONFIG_DIR),
+            "Expected path to contain '{}', got: {}",
+            USER_CONFIG_DIR,
+            path.display()
+        );
+    }
 }

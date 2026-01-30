@@ -303,4 +303,11 @@ mod tests {
         let result = client.validate_token().await.unwrap();
         assert!(!result);
     }
+
+    #[tokio::test]
+    async fn inner_returns_octocrab_reference() {
+        let client = GitHubClient::new(None).await.unwrap();
+        // Verify inner() returns a valid reference to the Octocrab client
+        let _octocrab: &Octocrab = client.inner();
+    }
 }

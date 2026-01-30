@@ -169,4 +169,25 @@ mod tests {
 
     // Note: Testing gh CLI integration requires the tool to be installed,
     // so we don't include those tests here. Integration tests should cover that.
+
+    #[tokio::test]
+    async fn has_token_true_with_repo_token() {
+        let repo = Repository::with_token("owner", "repo", "repo_token");
+        assert!(has_token(&repo, None).await);
+    }
+
+    #[tokio::test]
+    async fn has_token_true_with_global_token() {
+        let repo = Repository::new("owner", "repo");
+        assert!(has_token(&repo, Some("global_token")).await);
+    }
+
+    #[tokio::test]
+    async fn resolve_token_gh_cli_fallback_does_not_panic() {
+        // Without repo token or global token, resolve_token will try gh CLI.
+        // This test verifies the fallback path doesn't panic regardless of
+        // whether gh is installed or logged in on this machine.
+        let repo = Repository::new("owner", "repo");
+        let _result = resolve_token(&repo, None).await;
+    }
 }
