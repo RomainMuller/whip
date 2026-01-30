@@ -8,8 +8,10 @@ description = "An AI Agent orchestrator using Claude Code"
 
 [dependencies]
 anyhow = { workspace = true }
+secrecy = "0.10"
 tokio = { workspace = true }
 whip-config = { workspace = true }
+whip-github = { workspace = true }
 whip-protocol = { workspace = true }
 whip-tui = { workspace = true }
 

@@ -3167,10 +3167,12 @@ name = "whip"
 version = "0.0.1-dev"
 dependencies = [
  "anyhow",
+ "secrecy",
  "serde_json",
  "tempfile",
  "tokio",
  "whip-config",
+ "whip-github",
  "whip-protocol",
  "whip-tui",
 ]
