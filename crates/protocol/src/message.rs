@@ -41,6 +41,8 @@ pub enum Message {
     Refresh,
     /// Toggle help overlay.
     ToggleHelp,
+    /// Open the current item in the default browser.
+    OpenInBrowser,
     /// Mouse click at coordinates (column, row).
     ClickAt {
         /// Column (x coordinate) of the click.

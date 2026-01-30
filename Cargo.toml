@@ -8,6 +8,7 @@ description = "An AI Agent orchestrator using Claude Code"
 
 [dependencies]
 anyhow = { workspace = true }
+ratatui = { workspace = true }
 secrecy = "0.10"
 tokio = { workspace = true }
 whip-config = { workspace = true }
@@ -48,6 +49,7 @@ thiserror = { version = "2.0" }
 # Utilities
 chrono = { version = "0.4", features = ["serde"] }
 dirs = { version = "5.0" }
+open = { version = "5.3" }
 uuid = { version = "1.11", features = ["v4", "v5", "serde"] }
 
 # Testing

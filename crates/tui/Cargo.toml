@@ -9,6 +9,7 @@ description = "Terminal UI for whip - Ratatui-based Kanban board interface"
 [dependencies]
 anyhow = { workspace = true }
 crossterm = { workspace = true }
+open = { workspace = true }
 pulldown-cmark = { workspace = true }
 ratatui = { workspace = true }
 thiserror = { workspace = true }

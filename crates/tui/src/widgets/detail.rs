@@ -207,7 +207,8 @@ pub fn render_detail_panel(task: &Task, scroll_offset: u16, area: Rect, buf: &mu
 /// - 2 lines: Lane+Status on line 1, Created+Updated+GitHub on line 2
 /// - 3 lines: Lane+Status on line 1, Created+Updated on line 2, GitHub on line 3
 /// - 4 lines: Each item on its own line
-fn calculate_metadata_height(task: &Task, width: u16) -> u16 {
+#[must_use]
+pub fn calculate_metadata_height(task: &Task, width: u16) -> u16 {
     let state_name = state_display_name(task.state);
     let lane_name = task.lane.display_name();
     let created_fmt = task.created_at.format("%Y-%m-%d %H:%M").to_string();
