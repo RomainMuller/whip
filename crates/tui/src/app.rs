@@ -137,9 +137,13 @@ impl App {
                     self.should_quit = true;
                 }
                 Message::CloseSettings | Message::Escape if !settings.is_editing() => {
-                    // Close settings, potentially applying changes
+                    // Close settings and save changes
                     if let Some(settings) = self.settings_state.take() {
                         self.config = settings.into_config();
+                        // Save to disk
+                        if let Ok(path) = whip_config::persistence::default_user_config_path() {
+                            let _ = self.config.save_to(&path);
+                        }
                     }
                     self.state.focus = Focus::Board;
                 }
@@ -163,13 +167,6 @@ impl App {
                 }
                 Message::SettingsDelete => {
                     let _ = settings.delete_selected();
-                }
-                Message::SettingsSave => {
-                    // Save config to file
-                    if let Ok(path) = whip_config::persistence::default_user_config_path() {
-                        let _ = settings.config().save_to(&path);
-                        settings.mark_saved();
-                    }
                 }
                 Message::SettingsInput { ch } => {
                     settings.input_char(ch);

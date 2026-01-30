@@ -480,20 +480,6 @@ fn snapshot_settings_panel_authentication_section() {
 }
 
 #[test]
-fn snapshot_settings_panel_dirty() {
-    let config = Config::default();
-    let mut state = SettingsState::new(config);
-    state.mark_dirty();
-
-    let area = Rect::new(0, 0, 80, 24);
-    let mut buf = Buffer::empty(area);
-
-    render_settings_panel(&state, area, &mut buf);
-
-    insta::assert_snapshot!(buffer_to_string(&buf));
-}
-
-#[test]
 fn snapshot_settings_panel_small_terminal() {
     let config = Config::default();
     let state = SettingsState::new(config);

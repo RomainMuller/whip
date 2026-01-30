@@ -138,8 +138,6 @@ impl EditMode {
 pub struct SettingsState {
     /// The configuration being edited.
     config: Config,
-    /// Whether the config has unsaved changes.
-    dirty: bool,
     /// The currently selected section.
     section: SettingsSection,
     /// The selected item index within the current section.
@@ -163,13 +161,12 @@ impl SettingsState {
     ///
     /// let config = Config::default();
     /// let state = SettingsState::new(config);
-    /// assert!(!state.is_dirty());
+    /// assert_eq!(state.section(), whip_tui::settings_state::SettingsSection::Repositories);
     /// ```
     #[must_use]
     pub fn new(config: Config) -> Self {
         Self {
             config,
-            dirty: false,
             section: SettingsSection::default(),
             selected_item: 0,
             edit_mode: EditMode::None,
@@ -183,27 +180,8 @@ impl SettingsState {
     }
 
     /// Returns a mutable reference to the configuration.
-    ///
-    /// Note: This does not automatically mark the config as dirty.
-    /// Call `mark_dirty()` after making changes.
     pub fn config_mut(&mut self) -> &mut Config {
         &mut self.config
-    }
-
-    /// Returns whether the configuration has unsaved changes.
-    #[must_use]
-    pub fn is_dirty(&self) -> bool {
-        self.dirty
-    }
-
-    /// Marks the configuration as having unsaved changes.
-    pub fn mark_dirty(&mut self) {
-        self.dirty = true;
-    }
-
-    /// Marks the configuration as saved (no longer dirty).
-    pub fn mark_saved(&mut self) {
-        self.dirty = false;
     }
 
     /// Returns the currently selected section.
@@ -304,7 +282,6 @@ impl SettingsState {
                 } else if self.selected_item == 1 {
                     // Auto-adjust is a toggle - toggle it directly
                     self.config.polling.auto_adjust = !self.config.polling.auto_adjust;
-                    self.dirty = true;
                 }
             }
             SettingsSection::Authentication => {
@@ -327,7 +304,6 @@ impl SettingsState {
                         // Parse and set polling interval
                         if let Ok(interval) = value.parse::<u32>() {
                             self.config.polling.interval_secs = interval;
-                            self.dirty = true;
                         }
                     }
                     SettingsSection::Authentication => {
@@ -337,7 +313,6 @@ impl SettingsState {
                         } else {
                             Some(value.clone())
                         };
-                        self.dirty = true;
                     }
                     _ => {}
                 }
@@ -347,7 +322,6 @@ impl SettingsState {
                 // Try to parse and add the repository
                 if let Ok(repo) = Repository::parse_short(value) {
                     self.config.repositories.push(repo);
-                    self.dirty = true;
                 }
                 self.edit_mode = EditMode::None;
             }
@@ -368,7 +342,6 @@ impl SettingsState {
             SettingsSection::Repositories => {
                 if self.selected_item < self.config.repositories.len() {
                     self.config.repositories.remove(self.selected_item);
-                    self.dirty = true;
                     // Adjust selection if needed
                     if self.selected_item >= self.config.repositories.len()
                         && self.selected_item > 0
@@ -389,7 +362,6 @@ impl SettingsState {
         match self.section {
             SettingsSection::Polling if self.selected_item == 1 => {
                 self.config.polling.auto_adjust = !self.config.polling.auto_adjust;
-                self.dirty = true;
             }
             _ => {}
         }
@@ -441,7 +413,6 @@ mod tests {
     fn settings_state_new() {
         let config = Config::default();
         let state = SettingsState::new(config);
-        assert!(!state.is_dirty());
         assert_eq!(state.section(), SettingsSection::Repositories);
         assert_eq!(state.selected_item(), 0);
         assert!(!state.is_editing());
@@ -541,7 +512,6 @@ mod tests {
 
         state.confirm_edit();
         assert!(!state.is_editing());
-        assert!(state.is_dirty());
         assert_eq!(state.config().repositories.len(), 1);
         assert_eq!(state.config().repositories[0].full_name(), "owner/repo");
     }
@@ -554,7 +524,6 @@ mod tests {
         let mut state = SettingsState::new(config);
 
         assert!(state.delete_selected());
-        assert!(state.is_dirty());
         assert!(state.config().repositories.is_empty());
     }
 
@@ -569,7 +538,6 @@ mod tests {
         let initial = state.config().polling.auto_adjust;
         state.toggle_selected();
         assert_eq!(state.config().polling.auto_adjust, !initial);
-        assert!(state.is_dirty());
     }
 
     #[test]
@@ -592,7 +560,6 @@ mod tests {
 
         state.confirm_edit();
         assert_eq!(state.config().polling.interval_secs, 120);
-        assert!(state.is_dirty());
     }
 
     #[test]
@@ -605,6 +572,5 @@ mod tests {
         state.cancel_edit();
 
         assert!(!state.is_editing());
-        assert!(!state.is_dirty());
     }
 }

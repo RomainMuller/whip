@@ -53,15 +53,9 @@ pub fn render_settings_panel(state: &SettingsState, area: Rect, buf: &mut Buffer
     Clear.render(popup_area, buf);
 
     // Create the main block
-    let title = if state.is_dirty() {
-        " Settings * "
-    } else {
-        " Settings "
-    };
-
     let block = Block::default()
         .title(Span::styled(
-            title,
+            " Settings ",
             Style::default()
                 .fg(Color::LightCyan)
                 .add_modifier(Modifier::BOLD),
@@ -403,26 +397,6 @@ mod tests {
             .collect();
         assert!(content.contains("rust-lang/rust"));
         assert!(content.contains("tokio-rs/tokio"));
-    }
-
-    #[test]
-    fn render_settings_dirty_indicator() {
-        let config = Config::default();
-        let mut state = SettingsState::new(config);
-        state.mark_dirty();
-
-        let area = Rect::new(0, 0, 80, 24);
-        let mut buf = Buffer::empty(area);
-
-        render_settings_panel(&state, area, &mut buf);
-
-        let content: String = buf
-            .content()
-            .iter()
-            .map(|c| c.symbol().chars().next().unwrap_or(' '))
-            .collect();
-        // Dirty indicator should show asterisk
-        assert!(content.contains("Settings *") || content.contains("Settings*"));
     }
 
     #[test]
