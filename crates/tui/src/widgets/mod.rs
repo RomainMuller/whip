@@ -57,7 +57,8 @@ pub mod task_card;
 // Re-export primary rendering functions for convenience
 pub use board::render_board;
 pub use detail::{
-    description_area_dimensions, max_scroll_offset, render_detail_panel, state_indicator,
+    description_area_dimensions, label_color, max_scroll_offset, render_detail_panel,
+    state_indicator,
 };
 pub use help::render_help_overlay;
 pub use lane::{LanePosition, render_lane};
