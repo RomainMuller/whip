@@ -11,7 +11,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Widget},
 };
 
-use crate::settings_state::{EditMode, SettingsSection, SettingsState};
+use crate::settings_state::{EditMode, RepoEditField, SettingsSection, SettingsState};
 
 /// The width of the settings panel.
 const SETTINGS_WIDTH: u16 = 72;
@@ -128,6 +128,20 @@ fn render_repositories_section(state: &SettingsState, area: Rect, buf: &mut Buff
     let config = state.config();
     let selected = state.selected_item();
 
+    // Check if we're editing a repository
+    if let EditMode::EditRepository {
+        index,
+        path,
+        token,
+        active_field,
+        ..
+    } = state.edit_mode()
+    {
+        // Render edit mode UI
+        render_repo_edit_mode(*index, path, token, *active_field, area, buf);
+        return;
+    }
+
     let mut items: Vec<ListItem> = config
         .repositories
         .iter()
@@ -168,8 +182,8 @@ fn render_repositories_section(state: &SettingsState, area: Rect, buf: &mut Buff
 
     // Handle edit mode for adding repository
     let add_text = if add_new_selected {
-        if let EditMode::AddRepository { value, cursor } = state.edit_mode() {
-            format!("> + {}_", &value[..*cursor])
+        if let EditMode::AddRepository { value, .. } = state.edit_mode() {
+            format!("> + {}_", value)
         } else {
             "> + Add repository...".to_string()
         }
@@ -181,6 +195,91 @@ fn render_repositories_section(state: &SettingsState, area: Rect, buf: &mut Buff
 
     let list = List::new(items);
     list.render(area, buf);
+}
+
+/// Renders the repository edit mode UI with two fields.
+fn render_repo_edit_mode(
+    _index: usize,
+    path: &str,
+    token: &str,
+    active_field: RepoEditField,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // Path field
+            Constraint::Length(3), // Token field
+            Constraint::Length(2), // Help text
+            Constraint::Min(0),    // Remaining space
+        ])
+        .split(area);
+
+    // Path field
+    let path_active = active_field == RepoEditField::Path;
+    let path_style = if path_active {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default().fg(Color::Gray)
+    };
+    let path_border_style = if path_active {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+
+    let path_display = if path_active {
+        format!("{}_", path)
+    } else {
+        path.to_string()
+    };
+
+    let path_block = Block::default()
+        .title(Span::styled(" owner/repo ", path_border_style))
+        .borders(Borders::ALL)
+        .border_style(path_border_style);
+
+    let path_para = Paragraph::new(Span::styled(path_display, path_style)).block(path_block);
+    path_para.render(chunks[0], buf);
+
+    // Token field
+    let token_active = active_field == RepoEditField::Token;
+    let token_style = if token_active {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default().fg(Color::Gray)
+    };
+    let token_border_style = if token_active {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+
+    let token_display = if token_active {
+        format!("{}_", token)
+    } else if token.is_empty() {
+        "(optional)".to_string()
+    } else {
+        // Mask the token for security
+        format!("{}...", "*".repeat(token.len().min(16)))
+    };
+
+    let token_block = Block::default()
+        .title(Span::styled(" token (optional) ", token_border_style))
+        .borders(Borders::ALL)
+        .border_style(token_border_style);
+
+    let token_para = Paragraph::new(Span::styled(token_display, token_style)).block(token_block);
+    token_para.render(chunks[1], buf);
+
+    // Help text
+    let help = Paragraph::new(Span::styled(
+        "Tab: switch field | Enter: save | Esc: cancel",
+        Style::default().fg(Color::DarkGray),
+    ))
+    .alignment(Alignment::Center);
+    help.render(chunks[2], buf);
 }
 
 /// Renders the polling section.

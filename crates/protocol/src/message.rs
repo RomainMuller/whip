@@ -80,6 +80,8 @@ pub enum Message {
     },
     /// Delete the last character while editing.
     SettingsBackspace,
+    /// Switch to the next field in multi-field edit mode (e.g., Tab between path and token).
+    SettingsSwitchField,
 }
 
 impl Message {
@@ -150,6 +152,7 @@ impl Message {
                 | Self::SettingsSave
                 | Self::SettingsInput { .. }
                 | Self::SettingsBackspace
+                | Self::SettingsSwitchField
         )
     }
 }
@@ -193,6 +196,7 @@ mod tests {
         assert!(Message::SettingsSave.is_settings());
         assert!(Message::SettingsInput { ch: 'a' }.is_settings());
         assert!(Message::SettingsBackspace.is_settings());
+        assert!(Message::SettingsSwitchField.is_settings());
         assert!(!Message::NavigateLeft.is_settings());
         assert!(!Message::Quit.is_settings());
     }
@@ -223,6 +227,7 @@ mod tests {
             Message::SettingsSave,
             Message::SettingsInput { ch: 'x' },
             Message::SettingsBackspace,
+            Message::SettingsSwitchField,
         ];
 
         for msg in messages {

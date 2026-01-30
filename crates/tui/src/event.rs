@@ -141,6 +141,7 @@ pub fn key_to_settings_message(key: KeyEvent, is_editing: bool) -> Option<Messag
             KeyCode::Enter => Some(Message::SettingsConfirm),
             KeyCode::Esc => Some(Message::SettingsCancel),
             KeyCode::Backspace => Some(Message::SettingsBackspace),
+            KeyCode::Tab => Some(Message::SettingsSwitchField),
             KeyCode::Char(ch) => Some(Message::SettingsInput { ch }),
             _ => None,
         }

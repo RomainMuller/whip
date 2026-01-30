@@ -174,6 +174,9 @@ impl App {
                 Message::SettingsBackspace => {
                     settings.backspace();
                 }
+                Message::SettingsSwitchField => {
+                    settings.switch_edit_field();
+                }
                 // Toggle settings item (for checkboxes)
                 Message::Select if !settings.is_editing() => {
                     settings.toggle_selected();

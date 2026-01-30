@@ -55,6 +55,27 @@ impl SettingsSection {
     }
 }
 
+/// Which field is being edited in repository edit mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RepoEditField {
+    /// Editing the owner/repo path.
+    #[default]
+    Path,
+    /// Editing the optional token.
+    Token,
+}
+
+impl RepoEditField {
+    /// Switches to the next field.
+    #[must_use]
+    pub fn next(self) -> Self {
+        match self {
+            Self::Path => Self::Token,
+            Self::Token => Self::Path,
+        }
+    }
+}
+
 /// Edit mode for settings fields.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum EditMode {
@@ -75,6 +96,21 @@ pub enum EditMode {
         /// The cursor position.
         cursor: usize,
     },
+    /// Editing an existing repository.
+    EditRepository {
+        /// Index of the repository being edited.
+        index: usize,
+        /// The repository path (owner/repo).
+        path: String,
+        /// Cursor position in the path field.
+        path_cursor: usize,
+        /// The optional token.
+        token: String,
+        /// Cursor position in the token field.
+        token_cursor: usize,
+        /// Which field is currently active.
+        active_field: RepoEditField,
+    },
 }
 
 impl EditMode {
@@ -85,11 +121,22 @@ impl EditMode {
     }
 
     /// Returns the current edit value, if any.
+    ///
+    /// For `EditRepository`, returns the active field's value.
     #[must_use]
     pub fn value(&self) -> Option<&str> {
         match self {
             Self::None => None,
             Self::Text { value, .. } | Self::AddRepository { value, .. } => Some(value),
+            Self::EditRepository {
+                path,
+                token,
+                active_field,
+                ..
+            } => Some(match active_field {
+                RepoEditField::Path => path,
+                RepoEditField::Token => token,
+            }),
         }
     }
 
@@ -99,6 +146,15 @@ impl EditMode {
         match self {
             Self::None => None,
             Self::Text { cursor, .. } | Self::AddRepository { cursor, .. } => Some(*cursor),
+            Self::EditRepository {
+                path_cursor,
+                token_cursor,
+                active_field,
+                ..
+            } => Some(match active_field {
+                RepoEditField::Path => *path_cursor,
+                RepoEditField::Token => *token_cursor,
+            }),
         }
     }
 
@@ -110,25 +166,91 @@ impl EditMode {
                 value.insert(*cursor, ch);
                 *cursor += ch.len_utf8();
             }
+            Self::EditRepository {
+                path,
+                path_cursor,
+                token,
+                token_cursor,
+                active_field,
+                ..
+            } => match active_field {
+                RepoEditField::Path => {
+                    path.insert(*path_cursor, ch);
+                    *path_cursor += ch.len_utf8();
+                }
+                RepoEditField::Token => {
+                    token.insert(*token_cursor, ch);
+                    *token_cursor += ch.len_utf8();
+                }
+            },
         }
     }
 
     /// Deletes the character before the cursor (backspace).
     pub fn backspace(&mut self) {
+        fn do_backspace(value: &mut String, cursor: &mut usize) {
+            if *cursor > 0 {
+                let prev_boundary = value[..*cursor]
+                    .char_indices()
+                    .last()
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+                value.remove(prev_boundary);
+                *cursor = prev_boundary;
+            }
+        }
+
         match self {
             Self::None => {}
             Self::Text { value, cursor } | Self::AddRepository { value, cursor } => {
-                if *cursor > 0 {
-                    // Find the previous character boundary
-                    let prev_boundary = value[..*cursor]
-                        .char_indices()
-                        .last()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    value.remove(prev_boundary);
-                    *cursor = prev_boundary;
-                }
+                do_backspace(value, cursor);
             }
+            Self::EditRepository {
+                path,
+                path_cursor,
+                token,
+                token_cursor,
+                active_field,
+                ..
+            } => match active_field {
+                RepoEditField::Path => do_backspace(path, path_cursor),
+                RepoEditField::Token => do_backspace(token, token_cursor),
+            },
+        }
+    }
+
+    /// Switches to the next field in repository edit mode.
+    ///
+    /// Does nothing if not in `EditRepository` mode.
+    pub fn switch_field(&mut self) {
+        if let Self::EditRepository { active_field, .. } = self {
+            *active_field = active_field.next();
+        }
+    }
+
+    /// Returns the active field in repository edit mode, if applicable.
+    #[must_use]
+    pub fn active_repo_field(&self) -> Option<RepoEditField> {
+        if let Self::EditRepository { active_field, .. } = self {
+            Some(*active_field)
+        } else {
+            None
+        }
+    }
+
+    /// Returns repository edit data if in that mode.
+    #[must_use]
+    pub fn repo_edit_data(&self) -> Option<(&str, &str, RepoEditField)> {
+        if let Self::EditRepository {
+            path,
+            token,
+            active_field,
+            ..
+        } = self
+        {
+            Some((path, token, *active_field))
+        } else {
+            None
         }
     }
 }
@@ -263,7 +385,18 @@ impl SettingsState {
         match self.section {
             SettingsSection::Repositories => {
                 if self.selected_item < self.config.repositories.len() {
-                    // Edit existing repository (not implemented - show read-only)
+                    // Edit existing repository
+                    let repo = &self.config.repositories[self.selected_item];
+                    let path = repo.full_name();
+                    let token = repo.token().unwrap_or("").to_string();
+                    self.edit_mode = EditMode::EditRepository {
+                        index: self.selected_item,
+                        path: path.clone(),
+                        path_cursor: path.len(),
+                        token: token.clone(),
+                        token_cursor: token.len(),
+                        active_field: RepoEditField::Path,
+                    };
                 } else {
                     // Add new repository
                     self.edit_mode = EditMode::AddRepository {
@@ -325,6 +458,24 @@ impl SettingsState {
                 }
                 self.edit_mode = EditMode::None;
             }
+            EditMode::EditRepository {
+                index,
+                path,
+                token,
+                ..
+            } => {
+                // Try to parse the path and update the repository
+                if let Ok(mut repo) = Repository::parse_short(path) {
+                    // Set token if provided
+                    if !token.is_empty() {
+                        repo = Repository::with_token(repo.owner(), repo.repo(), token);
+                    }
+                    if *index < self.config.repositories.len() {
+                        self.config.repositories[*index] = repo;
+                    }
+                }
+                self.edit_mode = EditMode::None;
+            }
         }
     }
 
@@ -370,6 +521,13 @@ impl SettingsState {
     /// Handles character input while in edit mode.
     pub fn input_char(&mut self, ch: char) {
         self.edit_mode.insert_char(ch);
+    }
+
+    /// Switches to the next field in repository edit mode.
+    ///
+    /// Does nothing if not in repository edit mode.
+    pub fn switch_edit_field(&mut self) {
+        self.edit_mode.switch_field();
     }
 
     /// Handles backspace while in edit mode.
