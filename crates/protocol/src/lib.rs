@@ -46,4 +46,4 @@ pub mod task;
 pub use board::{KanbanBoard, Lane, LaneKind};
 pub use error::{ProtocolError, Result};
 pub use message::Message;
-pub use task::{Task, TaskId, TaskState};
+pub use task::{GitHubSource, Task, TaskId, TaskState};
