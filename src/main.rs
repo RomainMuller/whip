@@ -2,8 +2,13 @@
 //!
 //! This is the main binary that launches the TUI application.
 
+use std::time::Duration;
+
+use secrecy::SecretString;
 use whip_config::Config;
-use whip_protocol::dummy::dummy_board;
+use whip_config::auth::resolve_token;
+use whip_github::{CachedIssues, FetchOptions, GitHubClient, IssueCache, issue_to_task};
+use whip_protocol::KanbanBoard;
 use whip_tui::{App, terminal};
 
 #[tokio::main]
@@ -14,14 +19,23 @@ async fn main() -> anyhow::Result<()> {
         Config::default()
     });
 
+    // Load board from GitHub BEFORE terminal setup so errors are visible
+    let board = if config.has_repositories() {
+        load_github_board(&config).await.unwrap_or_else(|e| {
+            eprintln!("Warning: failed to load GitHub issues: {e}");
+            KanbanBoard::new()
+        })
+    } else {
+        eprintln!("No repositories configured. Add repositories to ~/.config/whip/config.json5");
+        KanbanBoard::new()
+    };
+
     // Install panic hook to restore terminal on panic
     terminal::install_panic_hook();
 
     // Setup terminal
     let mut terminal = terminal::setup_terminal()?;
 
-    // Create app with dummy board and loaded config
-    let board = dummy_board();
     let mut app = App::with_config(board, config);
 
     // Run the main loop
@@ -31,4 +45,86 @@ async fn main() -> anyhow::Result<()> {
     terminal::restore_terminal(&mut terminal)?;
 
     result
+}
+
+/// Loads a KanbanBoard from GitHub issues.
+///
+/// Uses caching with the following strategy:
+/// 1. Load from cache immediately (fast startup)
+/// 2. If cache is stale or missing, fetch from GitHub
+/// 3. Save to cache for next startup
+async fn load_github_board(config: &Config) -> anyhow::Result<KanbanBoard> {
+    let cache = IssueCache::new()?;
+    let mut board = KanbanBoard::new();
+
+    // Determine cache staleness threshold from config
+    let max_age = Duration::from_secs(u64::from(config.polling.effective_interval(true)));
+
+    for repo in &config.repositories {
+        let owner = repo.owner();
+        let repo_name = repo.repo();
+
+        eprint!("Loading issues from {owner}/{repo_name}... ");
+
+        // Try to load from cache first
+        if let Ok(Some(cached)) = cache.load(owner, repo_name)
+            && !cached.is_older_than(max_age)
+        {
+            // Cache is fresh, use it
+            let count = cached.tasks.len();
+            for task in cached.tasks {
+                board.add_task(task);
+            }
+            eprintln!("{count} issues (from cache)");
+            continue;
+        }
+
+        // Cache is stale or missing, fetch from GitHub
+        let token = resolve_token(repo, config.github_token.as_deref()).await;
+        let authenticated = token.is_some();
+        let token = token.map(SecretString::from);
+
+        match GitHubClient::new(token).await {
+            Ok(client) => {
+                let options = FetchOptions::default();
+                match client.fetch_issues(owner, repo_name, &options).await {
+                    Ok(issues) => {
+                        let tasks: Vec<_> = issues
+                            .iter()
+                            .map(|issue| issue_to_task(issue, owner, repo_name))
+                            .collect();
+
+                        let count = tasks.len();
+
+                        // Save to cache
+                        let cached = CachedIssues::new(tasks.clone(), None);
+                        let _ = cache.save(owner, repo_name, &cached);
+
+                        for task in tasks {
+                            board.add_task(task);
+                        }
+
+                        let auth_note = if authenticated { "" } else { " (unauthenticated)" };
+                        eprintln!("{count} issues{auth_note}");
+                    }
+                    Err(e) => {
+                        eprintln!("failed: {e}");
+                        // Try to use stale cache as fallback
+                        if let Ok(Some(cached)) = cache.load(owner, repo_name) {
+                            let count = cached.tasks.len();
+                            eprintln!("  Using stale cache: {count} issues");
+                            for task in cached.tasks {
+                                board.add_task(task);
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("failed to create client: {e}");
+            }
+        }
+    }
+
+    Ok(board)
 }
