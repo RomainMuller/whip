@@ -301,8 +301,11 @@ impl SettingsState {
                         value: self.config.polling.interval_secs.to_string(),
                         cursor: self.config.polling.interval_secs.to_string().len(),
                     };
+                } else if self.selected_item == 1 {
+                    // Auto-adjust is a toggle - toggle it directly
+                    self.config.polling.auto_adjust = !self.config.polling.auto_adjust;
+                    self.dirty = true;
                 }
-                // Auto-adjust is a toggle, handled differently
             }
             SettingsSection::Authentication => {
                 // Edit global token
