@@ -27,6 +27,15 @@ use crate::{
     },
 };
 
+/// Result of the application run loop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunResult {
+    /// User requested to quit the application.
+    Quit,
+    /// User requested to refresh data (Ctrl+R).
+    RefreshRequested,
+}
+
 /// The main application struct.
 ///
 /// Manages the application state and provides the main event loop.
@@ -34,6 +43,8 @@ use crate::{
 pub struct App {
     state: AppState,
     should_quit: bool,
+    /// Whether a refresh was requested (Ctrl+R).
+    refresh_requested: bool,
     /// Last known terminal area, used for click hit-testing.
     last_area: Rect,
     /// Whether the header was shown in the last render (affects click hit-testing).
@@ -65,6 +76,7 @@ impl App {
         Self {
             state: AppState::new(board),
             should_quit: false,
+            refresh_requested: false,
             last_area: Rect::default(),
             header_visible: true,
             settings_state: None,
@@ -95,6 +107,7 @@ impl App {
         Self {
             state: AppState::new(board),
             should_quit: false,
+            refresh_requested: false,
             last_area: Rect::default(),
             header_visible: true,
             settings_state: None,
@@ -118,6 +131,14 @@ impl App {
     #[must_use]
     pub fn is_settings_open(&self) -> bool {
         self.settings_state.is_some()
+    }
+
+    /// Replaces the current board with a new one.
+    ///
+    /// This is used after refreshing data from external sources.
+    /// Selection state is reset since task IDs may have changed.
+    pub fn set_board(&mut self, board: KanbanBoard) {
+        self.state = AppState::new(board);
     }
 
     /// Updates the application state based on a message.
@@ -284,7 +305,7 @@ impl App {
                 self.state.toggle_help();
             }
             Message::Refresh => {
-                // TODO: Implement refresh action
+                self.refresh_requested = true;
             }
             Message::ClickAt { column, row } => {
                 self.handle_click(column, row);
@@ -482,18 +503,25 @@ impl App {
     ///
     /// ```no_run
     /// use whip_protocol::KanbanBoard;
-    /// use whip_tui::{App, terminal};
+    /// use whip_tui::{App, RunResult, terminal};
     ///
     /// #[tokio::main]
     /// async fn main() -> anyhow::Result<()> {
     ///     let mut terminal = terminal::setup_terminal()?;
     ///     let mut app = App::new(KanbanBoard::new());
-    ///     app.run(&mut terminal).await?;
+    ///
+    ///     loop {
+    ///         match app.run(&mut terminal).await? {
+    ///             RunResult::Quit => break,
+    ///             RunResult::RefreshRequested => { /* refresh data */ }
+    ///         }
+    ///     }
+    ///
     ///     terminal::restore_terminal(&mut terminal)?;
     ///     Ok(())
     /// }
     /// ```
-    pub async fn run(&mut self, terminal: &mut AppTerminal) -> anyhow::Result<()> {
+    pub async fn run(&mut self, terminal: &mut AppTerminal) -> anyhow::Result<RunResult> {
         use crossterm::event::Event;
 
         loop {
@@ -526,11 +554,15 @@ impl App {
 
             // Check for quit
             if self.should_quit {
-                break;
+                return Ok(RunResult::Quit);
+            }
+
+            // Check for refresh request
+            if self.refresh_requested {
+                self.refresh_requested = false;
+                return Ok(RunResult::RefreshRequested);
             }
         }
-
-        Ok(())
     }
 
     /// Renders the header bar with title and help cue.
