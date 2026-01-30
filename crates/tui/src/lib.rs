@@ -9,6 +9,7 @@
 //!
 //! - [`app`]: Main application struct and run loop
 //! - [`state`]: Application state management
+//! - [`settings_state`]: Settings panel state management
 //! - [`terminal`]: Terminal setup, teardown, and panic handling
 //! - [`event`]: Event handling and key mappings
 //!
@@ -35,6 +36,7 @@
 pub mod app;
 pub mod event;
 pub mod layout;
+pub mod settings_state;
 pub mod state;
 pub mod terminal;
 pub mod widgets;

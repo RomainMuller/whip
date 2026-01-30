@@ -1,0 +1,27 @@
+---
+source: crates/tui/src/widgets/tests.rs
+expression: buffer_to_string(&buf)
+---
+
+    ╭ Settings ────────────────────────────────────────────────────────────╮
+    │                Repositories | Polling | Authentication               │
+    │                                                                      │
+    │> GitHub Token: ghp_...(set)                                          │
+    │                                                                      │
+    │  (Falls back to `gh auth token` if not set)                          │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │  ←→: sections | ↑↓: navigate | Enter: edit | d: delete | Esc: close  │
+    │                                                                      │
+    ╰──────────────────────────────────────────────────────────────────────╯

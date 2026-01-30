@@ -50,6 +50,7 @@ pub mod detail;
 pub mod help;
 pub mod lane;
 pub mod markdown;
+pub mod settings;
 pub mod status_bar;
 pub mod task_card;
 
@@ -60,6 +61,7 @@ pub use detail::{
 };
 pub use help::render_help_overlay;
 pub use lane::{LanePosition, render_lane};
+pub use settings::render_settings_panel;
 pub use status_bar::render_status_bar;
 pub use task_card::{render_task_card, state_color};
 

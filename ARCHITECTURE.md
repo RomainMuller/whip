@@ -15,10 +15,11 @@ flowchart TB
 
     whip --> tui[whip-tui<br/>Terminal UI]
     whip --> protocol[whip-protocol<br/>Shared Types]
+    whip --> config[whip-config<br/>Configuration]
     tui <-->|Uses Types| protocol
+    tui <-->|Uses Config| config
 
     tui -.->|Planned| session[whip-session<br/>Subprocess Management]
-    tui -.->|Planned| config[whip-config<br/>Configuration]
 
     session --> claude[Claude Code<br/>Subprocesses]
 ```
@@ -47,6 +48,16 @@ flowchart LR
         thiserror_tui[thiserror<br/>error types]
     end
 
+    subgraph config_crate[whip-config]
+        config[whip-config<br/>configuration management]
+    end
+
+    subgraph deps_config[Config Dependencies]
+        dirs[dirs<br/>platform directories]
+        serde_config[serde + serde_json5<br/>serialization]
+        thiserror_config[thiserror<br/>error types]
+    end
+
     subgraph protocol_crate[whip-protocol]
         protocol[whip-protocol<br/>shared types, no I/O]
     end
@@ -61,6 +72,7 @@ flowchart LR
     whip --> anyhow
     whip --> tokio
     whip --> tui
+    whip --> config
     whip --> protocol
 
     tui --> crossterm
@@ -68,7 +80,13 @@ flowchart LR
     tui --> ratatui
     tui --> thiserror_tui
     tui --> tokio
+    tui --> config
     tui --> protocol
+
+    config --> dirs
+    config --> serde_config
+    config --> thiserror_config
+    config --> tokio
 
     protocol --> chrono
     protocol --> serde
@@ -89,6 +107,34 @@ Entry point and orchestration:
 - Panic hook installation for terminal restoration
 - Main event loop coordination
 - Process exit handling
+
+### whip-config
+
+**Location:** `/crates/config/src/`
+
+Configuration management for loading, validating, and persisting settings:
+
+| Module           | Purpose                                       |
+| ---------------- | --------------------------------------------- |
+| `config.rs`      | Main `Config` struct and loading logic        |
+| `repository.rs`  | `Repository` type with flexible parsing       |
+| `polling.rs`     | `PollingConfig` with rate-limit awareness     |
+| `auth.rs`        | GitHub token resolution (repo/global/gh CLI)  |
+| `persistence.rs` | Config file reading and writing               |
+| `error.rs`       | `ConfigError` - configuration-specific errors |
+
+**Design Decisions:**
+
+- Supports JSON5 format for human-friendly config (comments, trailing commas)
+- Token resolution chain: repo-specific -> global -> `gh auth token` -> unauthenticated
+- Auto-adjusting polling intervals based on authentication status
+- Platform-aware config paths via `dirs` crate
+
+**Configuration Sources (Priority):**
+
+1. Local config (`./whip.json5` or `./whip.json`)
+2. User config (`~/.config/whip/config.json5` or `~/.config/whip/config.json`)
+3. Built-in defaults
 
 ### whip-protocol
 
@@ -117,13 +163,14 @@ Shared data types and contracts (no I/O dependencies):
 
 Terminal user interface (Ratatui + crossterm):
 
-| Module        | Purpose                                           |
-| ------------- | ------------------------------------------------- |
-| `app.rs`      | `App` - main struct, event loop, message dispatch |
-| `state.rs`    | `AppState`, `Focus` - navigation state            |
-| `event.rs`    | `poll_event()`, `key_to_message()` - input        |
-| `terminal.rs` | Terminal setup, restore, panic hooks              |
-| `widgets/`    | Rendering functions                               |
+| Module              | Purpose                                           |
+| ------------------- | ------------------------------------------------- |
+| `app.rs`            | `App` - main struct, event loop, message dispatch |
+| `state.rs`          | `AppState`, `Focus` - navigation state            |
+| `settings_state.rs` | `SettingsState` - settings panel state            |
+| `event.rs`          | `poll_event()`, `key_to_message()` - input        |
+| `terminal.rs`       | Terminal setup, restore, panic hooks              |
+| `widgets/`          | Rendering functions                               |
 
 **Widget Modules:**
 
@@ -134,6 +181,7 @@ Terminal user interface (Ratatui + crossterm):
 | `task_card.rs`  | Compact task card with state coloring |
 | `detail.rs`     | Full-screen task detail view          |
 | `help.rs`       | Centered help overlay                 |
+| `settings.rs`   | Configuration settings panel overlay  |
 | `status_bar.rs` | Footer keybinding hints               |
 | `markdown.rs`   | Markdown to styled Line conversion    |
 
@@ -276,12 +324,46 @@ Widgets are pure functions: `fn render(state, area, buffer)`:
 | Snapshot    | TUI widgets        | insta       | Visual regression        |
 | Integration | `tests/` (planned) | tokio::test | Cross-crate              |
 
-## Configuration (Planned)
+## Configuration
 
-Configuration sources (priority high to low):
+Configuration is handled by the `whip-config` crate. Settings can be viewed and modified via the TUI
+settings panel (Shift+S).
 
-1. Command-line arguments
-2. Environment variables (`WHIP_*`)
-3. Local config (`./whip.toml`)
-4. User config (`~/.config/whip/config.toml`)
-5. Built-in defaults
+### Configuration File Format
+
+Configuration files use JSON5 format (`.json5`) which supports comments and trailing commas.
+Standard JSON (`.json`) is also supported.
+
+```json5
+{
+    // Repositories to monitor
+    repositories: [
+        "owner/repo",                                    // Short format
+        { owner: "org", repo: "name", token: "ghp_x" }, // Full format with token
+    ],
+
+    // Polling configuration
+    polling: {
+        interval_secs: 60,   // Polling interval in seconds
+        auto_adjust: true,   // Auto-adjust based on auth status
+    },
+
+    // Global GitHub token (falls back to `gh auth token`)
+    github_token: "ghp_xxx",
+}
+```
+
+### Configuration Sources (Priority)
+
+1. Local config (`./whip.json5` or `./whip.json`)
+2. User config (`~/.config/whip/config.json5` or `~/.config/whip/config.json`)
+3. Built-in defaults
+
+### Token Resolution
+
+GitHub tokens are resolved in the following order:
+
+1. Repository-specific token (if configured in full format)
+2. Global `github_token` from config
+3. `gh auth token` command (GitHub CLI)
+4. Unauthenticated (rate-limited to 60 requests/hour)

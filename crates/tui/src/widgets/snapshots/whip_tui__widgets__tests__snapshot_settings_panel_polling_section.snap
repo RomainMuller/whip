@@ -1,0 +1,27 @@
+---
+source: crates/tui/src/widgets/tests.rs
+expression: buffer_to_string(&buf)
+---
+
+    ╭ Settings ────────────────────────────────────────────────────────────╮
+    │                Repositories | Polling | Authentication               │
+    │                                                                      │
+    │> Polling interval: 120 seconds                                       │
+    │                                                                      │
+    │  Auto-adjust for rate limits: [x]                                    │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │  ←→: sections | ↑↓: navigate | Enter: edit |           | Esc: close  │
+    │                                                                      │
+    ╰──────────────────────────────────────────────────────────────────────╯

@@ -12,8 +12,9 @@ categorized by type and prioritized by impact (high/medium/low).
 - [ ] **whip-session**: The `whip-session` crate is referenced in documentation but not yet
       implemented. This crate is essential for the core functionality of spawning and managing
       Claude Code subprocesses.
-- [ ] **whip-config**: The `whip-config` crate is referenced in documentation but not yet
-      implemented. This crate should handle configuration loading and validation.
+- [x] **whip-config**: ~~The `whip-config` crate is referenced in documentation but not yet
+      implemented.~~ Implemented with JSON5 config file support, repository management, polling
+      configuration, and GitHub token resolution.
 
 #### Error Handling
 
