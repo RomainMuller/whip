@@ -104,7 +104,11 @@ async fn load_github_board(config: &Config) -> anyhow::Result<KanbanBoard> {
                             board.add_task(task);
                         }
 
-                        let auth_note = if authenticated { "" } else { " (unauthenticated)" };
+                        let auth_note = if authenticated {
+                            ""
+                        } else {
+                            " (unauthenticated)"
+                        };
                         eprintln!("{count} issues{auth_note}");
                     }
                     Err(e) => {
