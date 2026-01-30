@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
     // Setup terminal
     let mut terminal = terminal::setup_terminal()?;
 
-    let mut app = App::with_config(board, config);
+    let mut app = App::with_config(board, config.clone());
 
     // Run the main loop, handling refresh requests
     loop {
