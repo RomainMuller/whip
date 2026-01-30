@@ -58,5 +58,6 @@ pulldown-cmark = { version = "0.13" }
 
 # Internal crates
 whip-config = { path = "crates/config" }
+whip-github = { path = "crates/github" }
 whip-protocol = { path = "crates/protocol" }
 whip-tui = { path = "crates/tui" }
