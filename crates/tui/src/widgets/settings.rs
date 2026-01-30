@@ -127,6 +127,7 @@ fn render_section_content(state: &SettingsState, area: Rect, buf: &mut Buffer) {
 fn render_repositories_section(state: &SettingsState, area: Rect, buf: &mut Buffer) {
     let config = state.config();
     let selected = state.selected_item();
+    let pending_delete = state.pending_delete();
 
     // Check if we're editing a repository
     if let EditMode::EditRepository {
@@ -147,7 +148,11 @@ fn render_repositories_section(state: &SettingsState, area: Rect, buf: &mut Buff
         .iter()
         .enumerate()
         .map(|(i, repo)| {
-            let style = if i == selected {
+            let is_pending_delete = pending_delete == Some(i);
+
+            let style = if is_pending_delete {
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+            } else if i == selected {
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD)
@@ -156,17 +161,27 @@ fn render_repositories_section(state: &SettingsState, area: Rect, buf: &mut Buff
             };
 
             let prefix = if i == selected { "> " } else { "  " };
-            let token_indicator = if repo.token().is_some() {
-                " [token]"
-            } else {
-                ""
-            };
 
-            ListItem::new(Line::from(vec![
-                Span::styled(prefix, style),
-                Span::styled(repo.full_name(), style),
-                Span::styled(token_indicator, Style::default().fg(Color::DarkGray)),
-            ]))
+            if is_pending_delete {
+                // Show confirmation prompt
+                ListItem::new(Line::from(vec![
+                    Span::styled(prefix, style),
+                    Span::styled(repo.full_name(), style),
+                    Span::styled(" Delete? (y/n)", Style::default().fg(Color::Red)),
+                ]))
+            } else {
+                let token_indicator = if repo.token().is_some() {
+                    " [token]"
+                } else {
+                    ""
+                };
+
+                ListItem::new(Line::from(vec![
+                    Span::styled(prefix, style),
+                    Span::styled(repo.full_name(), style),
+                    Span::styled(token_indicator, Style::default().fg(Color::DarkGray)),
+                ]))
+            }
         })
         .collect();
 

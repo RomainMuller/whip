@@ -163,13 +163,30 @@ impl App {
                     settings.confirm_edit();
                 }
                 Message::SettingsCancel | Message::Escape => {
-                    settings.cancel_edit();
+                    if settings.is_delete_pending() {
+                        settings.cancel_delete();
+                    } else {
+                        settings.cancel_edit();
+                    }
                 }
                 Message::SettingsDelete => {
-                    let _ = settings.delete_selected();
+                    let _ = settings.request_delete();
                 }
                 Message::SettingsInput { ch } => {
-                    settings.input_char(ch);
+                    // Handle delete confirmation
+                    if settings.is_delete_pending() {
+                        match ch {
+                            'y' | 'Y' => {
+                                let _ = settings.confirm_delete();
+                            }
+                            'n' | 'N' => {
+                                settings.cancel_delete();
+                            }
+                            _ => {}
+                        }
+                    } else {
+                        settings.input_char(ch);
+                    }
                 }
                 Message::SettingsBackspace => {
                     settings.backspace();
@@ -1161,8 +1178,11 @@ mod tests {
         // Open settings, make a change, close
         app.update(Message::OpenSettings);
 
-        // Delete the repository
+        // Request delete (enters confirmation mode)
         app.update(Message::SettingsDelete);
+
+        // Confirm the delete
+        app.update(Message::SettingsInput { ch: 'y' });
 
         // Close settings
         app.update(Message::CloseSettings);

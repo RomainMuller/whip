@@ -266,6 +266,8 @@ pub struct SettingsState {
     selected_item: usize,
     /// The current edit mode.
     edit_mode: EditMode,
+    /// Index of item pending deletion (waiting for confirmation).
+    pending_delete: Option<usize>,
 }
 
 impl SettingsState {
@@ -292,6 +294,7 @@ impl SettingsState {
             section: SettingsSection::default(),
             selected_item: 0,
             edit_mode: EditMode::None,
+            pending_delete: None,
         }
     }
 
@@ -459,10 +462,7 @@ impl SettingsState {
                 self.edit_mode = EditMode::None;
             }
             EditMode::EditRepository {
-                index,
-                path,
-                token,
-                ..
+                index, path, token, ..
             } => {
                 // Try to parse the path and update the repository
                 if let Ok(mut repo) = Repository::parse_short(path) {
@@ -484,21 +484,16 @@ impl SettingsState {
         self.edit_mode = EditMode::None;
     }
 
-    /// Deletes the currently selected item (if applicable).
+    /// Requests deletion of the currently selected item.
     ///
-    /// Returns `true` if an item was deleted.
+    /// This sets the item as pending deletion and requires confirmation
+    /// via `confirm_delete()`. Returns `true` if an item can be deleted.
     #[must_use]
-    pub fn delete_selected(&mut self) -> bool {
+    pub fn request_delete(&mut self) -> bool {
         match self.section {
             SettingsSection::Repositories => {
                 if self.selected_item < self.config.repositories.len() {
-                    self.config.repositories.remove(self.selected_item);
-                    // Adjust selection if needed
-                    if self.selected_item >= self.config.repositories.len()
-                        && self.selected_item > 0
-                    {
-                        self.selected_item -= 1;
-                    }
+                    self.pending_delete = Some(self.selected_item);
                     true
                 } else {
                     false
@@ -506,6 +501,41 @@ impl SettingsState {
             }
             _ => false,
         }
+    }
+
+    /// Returns the index of the item pending deletion, if any.
+    #[must_use]
+    pub fn pending_delete(&self) -> Option<usize> {
+        self.pending_delete
+    }
+
+    /// Confirms and executes the pending deletion.
+    ///
+    /// Returns `true` if an item was deleted.
+    #[must_use]
+    pub fn confirm_delete(&mut self) -> bool {
+        if let Some(index) = self.pending_delete.take()
+            && index < self.config.repositories.len()
+        {
+            self.config.repositories.remove(index);
+            // Adjust selection if needed
+            if self.selected_item >= self.config.repositories.len() && self.selected_item > 0 {
+                self.selected_item -= 1;
+            }
+            return true;
+        }
+        false
+    }
+
+    /// Cancels the pending deletion.
+    pub fn cancel_delete(&mut self) {
+        self.pending_delete = None;
+    }
+
+    /// Returns `true` if a deletion is pending confirmation.
+    #[must_use]
+    pub fn is_delete_pending(&self) -> bool {
+        self.pending_delete.is_some()
     }
 
     /// Toggles boolean settings (like auto-adjust).
@@ -681,8 +711,35 @@ mod tests {
 
         let mut state = SettingsState::new(config);
 
-        assert!(state.delete_selected());
+        // Request delete - should set pending
+        assert!(state.request_delete());
+        assert!(state.is_delete_pending());
+        assert_eq!(state.pending_delete(), Some(0));
+        // Item not yet deleted
+        assert_eq!(state.config().repositories.len(), 1);
+
+        // Confirm delete
+        assert!(state.confirm_delete());
+        assert!(!state.is_delete_pending());
         assert!(state.config().repositories.is_empty());
+    }
+
+    #[test]
+    fn settings_state_cancel_delete() {
+        let mut config = Config::default();
+        config.repositories.push(Repository::new("owner", "repo"));
+
+        let mut state = SettingsState::new(config);
+
+        // Request delete
+        assert!(state.request_delete());
+        assert!(state.is_delete_pending());
+
+        // Cancel delete
+        state.cancel_delete();
+        assert!(!state.is_delete_pending());
+        // Item still there
+        assert_eq!(state.config().repositories.len(), 1);
     }
 
     #[test]
