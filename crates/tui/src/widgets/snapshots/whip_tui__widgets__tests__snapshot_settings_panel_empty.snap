@@ -22,6 +22,6 @@ expression: buffer_to_string(&buf)
     │                                                                      │
     │                                                                      │
     │                                                                      │
-    │  ←→: sections | ↑↓: navigate | Enter: edit | d: delete | Esc: close  │
+    │  ←→: sections | ↑↓: navigate | Enter: edit |           | Esc: close  │
     │                                                                      │
     ╰──────────────────────────────────────────────────────────────────────╯

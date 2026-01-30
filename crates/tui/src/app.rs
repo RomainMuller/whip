@@ -194,6 +194,12 @@ impl App {
                 Message::SettingsSwitchField => {
                     settings.switch_edit_field();
                 }
+                Message::SettingsCursorLeft => {
+                    settings.move_cursor_left();
+                }
+                Message::SettingsCursorRight => {
+                    settings.move_cursor_right();
+                }
                 // Toggle settings item (for checkboxes)
                 Message::Select if !settings.is_editing() => {
                     settings.toggle_selected();
@@ -501,7 +507,11 @@ impl App {
                     if let Event::Key(key) = event {
                         let is_editing =
                             self.settings_state.as_ref().is_some_and(|s| s.is_editing());
-                        key_to_settings_message(key, is_editing)
+                        let is_delete_pending = self
+                            .settings_state
+                            .as_ref()
+                            .is_some_and(|s| s.is_delete_pending());
+                        key_to_settings_message(key, is_editing, is_delete_pending)
                     } else {
                         event_to_message(&event)
                     }

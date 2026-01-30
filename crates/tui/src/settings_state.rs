@@ -219,6 +219,74 @@ impl EditMode {
         }
     }
 
+    /// Moves the cursor one character to the left (respecting UTF-8 boundaries).
+    ///
+    /// Does nothing if the cursor is already at position 0 or not in edit mode.
+    pub fn move_cursor_left(&mut self) {
+        fn do_move_left(value: &str, cursor: &mut usize) {
+            if *cursor > 0 {
+                // Find the previous character boundary
+                *cursor = value[..*cursor]
+                    .char_indices()
+                    .last()
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+            }
+        }
+
+        match self {
+            Self::None => {}
+            Self::Text { value, cursor } | Self::AddRepository { value, cursor } => {
+                do_move_left(value, cursor);
+            }
+            Self::EditRepository {
+                path,
+                path_cursor,
+                token,
+                token_cursor,
+                active_field,
+                ..
+            } => match active_field {
+                RepoEditField::Path => do_move_left(path, path_cursor),
+                RepoEditField::Token => do_move_left(token, token_cursor),
+            },
+        }
+    }
+
+    /// Moves the cursor one character to the right (respecting UTF-8 boundaries).
+    ///
+    /// Does nothing if the cursor is already at the end of the text or not in edit mode.
+    pub fn move_cursor_right(&mut self) {
+        fn do_move_right(value: &str, cursor: &mut usize) {
+            if *cursor < value.len() {
+                // Find the next character boundary
+                *cursor = value[*cursor..]
+                    .char_indices()
+                    .nth(1)
+                    .map(|(i, _)| *cursor + i)
+                    .unwrap_or(value.len());
+            }
+        }
+
+        match self {
+            Self::None => {}
+            Self::Text { value, cursor } | Self::AddRepository { value, cursor } => {
+                do_move_right(value, cursor);
+            }
+            Self::EditRepository {
+                path,
+                path_cursor,
+                token,
+                token_cursor,
+                active_field,
+                ..
+            } => match active_field {
+                RepoEditField::Path => do_move_right(path, path_cursor),
+                RepoEditField::Token => do_move_right(token, token_cursor),
+            },
+        }
+    }
+
     /// Switches to the next field in repository edit mode.
     ///
     /// Does nothing if not in `EditRepository` mode.
@@ -538,6 +606,32 @@ impl SettingsState {
         self.pending_delete.is_some()
     }
 
+    /// Returns `true` if the currently selected item can be deleted.
+    ///
+    /// Deletable items are:
+    /// - Repositories (but not the "Add repository..." item at the end)
+    /// - The global token in the Authentication section (when set)
+    #[must_use]
+    pub fn can_delete_selected(&self) -> bool {
+        match self.section {
+            SettingsSection::Repositories => {
+                // Can delete a repository, but not the "Add repository..." item
+                self.selected_item < self.config.repositories.len()
+            }
+            SettingsSection::Authentication => {
+                // Can delete the token if it's set
+                self.config
+                    .github_token
+                    .as_ref()
+                    .is_some_and(|t| !t.is_empty())
+            }
+            SettingsSection::Polling => {
+                // Polling settings cannot be deleted
+                false
+            }
+        }
+    }
+
     /// Toggles boolean settings (like auto-adjust).
     pub fn toggle_selected(&mut self) {
         match self.section {
@@ -563,6 +657,16 @@ impl SettingsState {
     /// Handles backspace while in edit mode.
     pub fn backspace(&mut self) {
         self.edit_mode.backspace();
+    }
+
+    /// Moves the cursor left while in edit mode.
+    pub fn move_cursor_left(&mut self) {
+        self.edit_mode.move_cursor_left();
+    }
+
+    /// Moves the cursor right while in edit mode.
+    pub fn move_cursor_right(&mut self) {
+        self.edit_mode.move_cursor_right();
     }
 
     /// Takes the configuration out of this state, consuming it.
@@ -787,5 +891,205 @@ mod tests {
         state.cancel_edit();
 
         assert!(!state.is_editing());
+    }
+
+    #[test]
+    fn can_delete_selected_repositories() {
+        let mut config = Config::default();
+        config.repositories.push(Repository::new("owner", "repo"));
+
+        let mut state = SettingsState::new(config);
+
+        // First item is a repository - can delete
+        assert!(state.can_delete_selected());
+
+        // Navigate to "Add repository..." item - cannot delete
+        state.navigate(1);
+        assert!(!state.can_delete_selected());
+    }
+
+    #[test]
+    fn can_delete_selected_polling() {
+        let config = Config::default();
+        let mut state = SettingsState::new(config);
+
+        state.next_section(); // Go to Polling
+
+        // Polling interval - cannot delete
+        assert!(!state.can_delete_selected());
+
+        // Auto-adjust toggle - cannot delete
+        state.navigate(1);
+        assert!(!state.can_delete_selected());
+    }
+
+    #[test]
+    fn can_delete_selected_authentication() {
+        let mut config = Config::default();
+        config.github_token = Some("test-token".to_string());
+
+        let mut state = SettingsState::new(config);
+
+        state.next_section(); // Polling
+        state.next_section(); // Authentication
+
+        // Token is set - can delete
+        assert!(state.can_delete_selected());
+
+        // Clear the token
+        state.config_mut().github_token = None;
+        assert!(!state.can_delete_selected());
+
+        // Empty token - cannot delete
+        state.config_mut().github_token = Some(String::new());
+        assert!(!state.can_delete_selected());
+    }
+
+    #[test]
+    fn edit_mode_cursor_movement_ascii() {
+        let mut edit = EditMode::Text {
+            value: "hello".to_string(),
+            cursor: 5, // End of string
+        };
+
+        // Move left
+        edit.move_cursor_left();
+        assert_eq!(edit.cursor(), Some(4));
+
+        edit.move_cursor_left();
+        assert_eq!(edit.cursor(), Some(3));
+
+        // Move right
+        edit.move_cursor_right();
+        assert_eq!(edit.cursor(), Some(4));
+
+        edit.move_cursor_right();
+        assert_eq!(edit.cursor(), Some(5)); // End
+
+        // Moving right at end does nothing
+        edit.move_cursor_right();
+        assert_eq!(edit.cursor(), Some(5));
+
+        // Move all the way left
+        for _ in 0..10 {
+            edit.move_cursor_left();
+        }
+        assert_eq!(edit.cursor(), Some(0));
+
+        // Moving left at start does nothing
+        edit.move_cursor_left();
+        assert_eq!(edit.cursor(), Some(0));
+    }
+
+    #[test]
+    fn edit_mode_cursor_movement_utf8() {
+        // Test with multi-byte UTF-8 characters
+        // "cafe" with an accent on the 'e': cafe with combining accent = 5 chars but 6 bytes
+        // Or simpler: use a 2-byte character like e-acute
+        let mut edit = EditMode::Text {
+            value: "cafe\u{0301}".to_string(), // "cafe" + combining acute accent (cafe with accent)
+            cursor: 6,                         // End of string (6 bytes)
+        };
+
+        // Move left from end - should land before the combining accent
+        edit.move_cursor_left();
+        assert_eq!(edit.cursor(), Some(4)); // The combining accent is at byte 4-5
+
+        // Move left again - lands before 'e'
+        edit.move_cursor_left();
+        assert_eq!(edit.cursor(), Some(3));
+
+        // Move right - lands before the combining accent
+        edit.move_cursor_right();
+        assert_eq!(edit.cursor(), Some(4));
+
+        // Move right - lands at end
+        edit.move_cursor_right();
+        assert_eq!(edit.cursor(), Some(6));
+    }
+
+    #[test]
+    fn edit_mode_cursor_movement_add_repository() {
+        let mut edit = EditMode::AddRepository {
+            value: "owner/repo".to_string(),
+            cursor: 10,
+        };
+
+        // Move left
+        edit.move_cursor_left();
+        assert_eq!(edit.cursor(), Some(9));
+
+        // Move right back
+        edit.move_cursor_right();
+        assert_eq!(edit.cursor(), Some(10));
+    }
+
+    #[test]
+    fn edit_mode_cursor_movement_edit_repository() {
+        let mut edit = EditMode::EditRepository {
+            index: 0,
+            path: "owner/repo".to_string(),
+            path_cursor: 10,
+            token: "secret".to_string(),
+            token_cursor: 6,
+            active_field: RepoEditField::Path,
+        };
+
+        // Move cursor left in path field
+        edit.move_cursor_left();
+        assert_eq!(edit.cursor(), Some(9)); // path_cursor moved
+
+        // Switch to token field
+        edit.switch_field();
+
+        // Move cursor left in token field
+        edit.move_cursor_left();
+        assert_eq!(edit.cursor(), Some(5)); // token_cursor moved
+
+        // Move right in token field
+        edit.move_cursor_right();
+        assert_eq!(edit.cursor(), Some(6));
+    }
+
+    #[test]
+    fn edit_mode_insert_at_cursor_position() {
+        let mut edit = EditMode::Text {
+            value: "hllo".to_string(),
+            cursor: 1, // After 'h'
+        };
+
+        // Insert 'e' at cursor
+        edit.insert_char('e');
+        assert_eq!(edit.value(), Some("hello"));
+        assert_eq!(edit.cursor(), Some(2)); // Cursor moved past inserted char
+
+        // Move cursor to position 1 (after 'h'), then insert 'X'
+        edit.move_cursor_left(); // Now at position 1
+        edit.insert_char('X');
+        assert_eq!(edit.value(), Some("hXello"));
+        assert_eq!(edit.cursor(), Some(2)); // After 'X'
+    }
+
+    #[test]
+    fn settings_state_cursor_methods() {
+        let config = Config::default();
+        let mut state = SettingsState::new(config);
+
+        // Start editing (add repository)
+        state.start_edit();
+
+        // Type something
+        state.input_char('t');
+        state.input_char('e');
+        state.input_char('s');
+        state.input_char('t');
+
+        // Move cursor left
+        state.move_cursor_left();
+        assert_eq!(state.edit_mode().cursor(), Some(3));
+
+        // Move cursor right
+        state.move_cursor_right();
+        assert_eq!(state.edit_mode().cursor(), Some(4));
     }
 }

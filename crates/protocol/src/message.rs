@@ -82,6 +82,10 @@ pub enum Message {
     SettingsBackspace,
     /// Switch to the next field in multi-field edit mode (e.g., Tab between path and token).
     SettingsSwitchField,
+    /// Move cursor left within the current text field.
+    SettingsCursorLeft,
+    /// Move cursor right within the current text field.
+    SettingsCursorRight,
 }
 
 impl Message {
@@ -153,6 +157,8 @@ impl Message {
                 | Self::SettingsInput { .. }
                 | Self::SettingsBackspace
                 | Self::SettingsSwitchField
+                | Self::SettingsCursorLeft
+                | Self::SettingsCursorRight
         )
     }
 }
@@ -197,6 +203,8 @@ mod tests {
         assert!(Message::SettingsInput { ch: 'a' }.is_settings());
         assert!(Message::SettingsBackspace.is_settings());
         assert!(Message::SettingsSwitchField.is_settings());
+        assert!(Message::SettingsCursorLeft.is_settings());
+        assert!(Message::SettingsCursorRight.is_settings());
         assert!(!Message::NavigateLeft.is_settings());
         assert!(!Message::Quit.is_settings());
     }
@@ -228,6 +236,8 @@ mod tests {
             Message::SettingsInput { ch: 'x' },
             Message::SettingsBackspace,
             Message::SettingsSwitchField,
+            Message::SettingsCursorLeft,
+            Message::SettingsCursorRight,
         ];
 
         for msg in messages {

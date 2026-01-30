@@ -13,6 +13,29 @@ use ratatui::{
 
 use crate::settings_state::{EditMode, RepoEditField, SettingsSection, SettingsState};
 
+/// Formats a text field value with a cursor indicator at the specified position.
+///
+/// Inserts an underscore `_` at the cursor position to indicate where the next
+/// character will be inserted. Respects UTF-8 character boundaries.
+fn format_with_cursor(value: &str, cursor: usize) -> String {
+    // Ensure cursor is at a valid UTF-8 boundary
+    let safe_cursor = if cursor > value.len() {
+        value.len()
+    } else {
+        // Find the nearest valid boundary at or before cursor
+        value
+            .char_indices()
+            .take_while(|(i, _)| *i <= cursor)
+            .last()
+            .map(|(i, c)| if i == cursor { i } else { i + c.len_utf8() })
+            .unwrap_or(0)
+            .min(cursor)
+    };
+
+    let (before, after) = value.split_at(safe_cursor.min(value.len()));
+    format!("{}_{}", before, after)
+}
+
 /// The width of the settings panel.
 const SETTINGS_WIDTH: u16 = 72;
 
@@ -133,13 +156,23 @@ fn render_repositories_section(state: &SettingsState, area: Rect, buf: &mut Buff
     if let EditMode::EditRepository {
         index,
         path,
+        path_cursor,
         token,
+        token_cursor,
         active_field,
-        ..
     } = state.edit_mode()
     {
         // Render edit mode UI
-        render_repo_edit_mode(*index, path, token, *active_field, area, buf);
+        render_repo_edit_mode(
+            *index,
+            path,
+            *path_cursor,
+            token,
+            *token_cursor,
+            *active_field,
+            area,
+            buf,
+        );
         return;
     }
 
@@ -197,8 +230,8 @@ fn render_repositories_section(state: &SettingsState, area: Rect, buf: &mut Buff
 
     // Handle edit mode for adding repository
     let add_text = if add_new_selected {
-        if let EditMode::AddRepository { value, .. } = state.edit_mode() {
-            format!("> + {}_", value)
+        if let EditMode::AddRepository { value, cursor } = state.edit_mode() {
+            format!("> + {}", format_with_cursor(value, *cursor))
         } else {
             "> + Add repository...".to_string()
         }
@@ -213,10 +246,13 @@ fn render_repositories_section(state: &SettingsState, area: Rect, buf: &mut Buff
 }
 
 /// Renders the repository edit mode UI with two fields.
+#[allow(clippy::too_many_arguments)]
 fn render_repo_edit_mode(
     _index: usize,
     path: &str,
+    path_cursor: usize,
     token: &str,
+    token_cursor: usize,
     active_field: RepoEditField,
     area: Rect,
     buf: &mut Buffer,
@@ -245,7 +281,7 @@ fn render_repo_edit_mode(
     };
 
     let path_display = if path_active {
-        format!("{}_", path)
+        format_with_cursor(path, path_cursor)
     } else {
         path.to_string()
     };
@@ -272,7 +308,7 @@ fn render_repo_edit_mode(
     };
 
     let token_display = if token_active {
-        format!("{}_", token)
+        format_with_cursor(token, token_cursor)
     } else if token.is_empty() {
         "(optional)".to_string()
     } else {
@@ -290,7 +326,7 @@ fn render_repo_edit_mode(
 
     // Help text
     let help = Paragraph::new(Span::styled(
-        "Tab: switch field | Enter: save | Esc: cancel",
+        "Tab: switch field | ←→: move cursor | Enter: save | Esc: cancel",
         Style::default().fg(Color::DarkGray),
     ))
     .alignment(Alignment::Center);
@@ -318,8 +354,8 @@ fn render_polling_section(state: &SettingsState, area: Rect, buf: &mut Buffer) {
     };
 
     let interval_value = if interval_selected {
-        if let EditMode::Text { value, .. } = state.edit_mode() {
-            format!("{}_ seconds", value)
+        if let EditMode::Text { value, cursor } = state.edit_mode() {
+            format!("{} seconds", format_with_cursor(value, *cursor))
         } else {
             format!("{} seconds", config.polling.interval_secs)
         }
@@ -378,12 +414,14 @@ fn render_authentication_section(state: &SettingsState, area: Rect, buf: &mut Bu
     };
 
     let token_display = if token_selected {
-        if let EditMode::Text { value, .. } = state.edit_mode() {
+        if let EditMode::Text { value, cursor } = state.edit_mode() {
             if value.is_empty() {
-                "(editing...)".to_string()
+                // Show cursor even when empty
+                "_".to_string()
             } else {
-                // Mask the token for security
-                format!("{}...", &"*".repeat(value.len().min(20)))
+                // Show cursor position with masked token
+                let masked = "*".repeat(value.len().min(20));
+                format_with_cursor(&masked, (*cursor).min(masked.len()))
             }
         } else {
             match &config.github_token {
@@ -428,9 +466,13 @@ fn render_authentication_section(state: &SettingsState, area: Rect, buf: &mut Bu
 /// Renders the help/status bar at the bottom of the settings panel.
 fn render_settings_help(state: &SettingsState, area: Rect, buf: &mut Buffer) {
     let help_text = if state.is_editing() {
-        "Enter: confirm | Esc: cancel"
+        "←→: move cursor | Enter: confirm | Esc: cancel".to_string()
+    } else if state.can_delete_selected() {
+        "←→: sections | ↑↓: navigate | Enter: edit | d: delete | Esc: close".to_string()
     } else {
-        "←→: sections | ↑↓: navigate | Enter: edit | d: delete | Esc: close"
+        // Use whitespace instead of "d: delete" to prevent layout shifting
+        // "d: delete" is 9 characters, so we use 9 spaces
+        "←→: sections | ↑↓: navigate | Enter: edit |           | Esc: close".to_string()
     };
 
     let help = Paragraph::new(Line::from(Span::styled(

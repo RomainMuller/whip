@@ -119,30 +119,44 @@ pub fn key_to_message(key: KeyEvent) -> Option<Message> {
 ///
 /// | Key | Action |
 /// |-----|--------|
-/// | `Left` | Previous section |
-/// | `Right` | Next section |
+/// | `Left` | Previous section (nav mode) / Move cursor left (edit mode) |
+/// | `Right` | Next section (nav mode) / Move cursor right (edit mode) |
 /// | `Up` | Navigate up |
 /// | `Down` | Navigate down |
 /// | `Enter` | Edit/confirm |
 /// | `Esc` | Cancel/close |
 /// | `d` | Delete |
+/// | `y`/`n` | Confirm/cancel delete (when delete pending) |
 /// | `Backspace` | Backspace (in edit mode) |
 /// | Any char | Input (in edit mode) |
 #[must_use]
-pub fn key_to_settings_message(key: KeyEvent, is_editing: bool) -> Option<Message> {
+pub fn key_to_settings_message(
+    key: KeyEvent,
+    is_editing: bool,
+    is_delete_pending: bool,
+) -> Option<Message> {
     // Check for Ctrl+C first (always works)
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
         return Some(Message::Quit);
     }
 
     if is_editing {
-        // In edit mode, capture text input
+        // In edit mode, capture text input and cursor movement
         match key.code {
             KeyCode::Enter => Some(Message::SettingsConfirm),
             KeyCode::Esc => Some(Message::SettingsCancel),
             KeyCode::Backspace => Some(Message::SettingsBackspace),
             KeyCode::Tab => Some(Message::SettingsSwitchField),
+            KeyCode::Left => Some(Message::SettingsCursorLeft),
+            KeyCode::Right => Some(Message::SettingsCursorRight),
             KeyCode::Char(ch) => Some(Message::SettingsInput { ch }),
+            _ => None,
+        }
+    } else if is_delete_pending {
+        // Delete confirmation mode - route y/n keys
+        match key.code {
+            KeyCode::Char(ch @ ('y' | 'Y' | 'n' | 'N')) => Some(Message::SettingsInput { ch }),
+            KeyCode::Esc => Some(Message::SettingsCancel),
             _ => None,
         }
     } else {
@@ -153,7 +167,7 @@ pub fn key_to_settings_message(key: KeyEvent, is_editing: bool) -> Option<Messag
             KeyCode::Right => Some(Message::SettingsNextSection),
             KeyCode::Up => Some(Message::SettingsNavigate { delta: -1 }),
             KeyCode::Down => Some(Message::SettingsNavigate { delta: 1 }),
-            KeyCode::Enter | KeyCode::Char(' ') => Some(Message::SettingsEdit),
+            KeyCode::Enter => Some(Message::SettingsEdit),
             KeyCode::Char('d') => Some(Message::SettingsDelete),
             _ => None,
         }
@@ -352,41 +366,41 @@ mod tests {
     fn settings_navigation_mode() {
         // Right moves to next section
         assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Right), false),
+            key_to_settings_message(make_key(KeyCode::Right), false, false),
             Some(Message::SettingsNextSection)
         );
 
         // Left moves to previous section
         assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Left), false),
+            key_to_settings_message(make_key(KeyCode::Left), false, false),
             Some(Message::SettingsPrevSection)
         );
 
         // Up/Down arrow keys navigate within section
         assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Up), false),
+            key_to_settings_message(make_key(KeyCode::Up), false, false),
             Some(Message::SettingsNavigate { delta: -1 })
         );
         assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Down), false),
+            key_to_settings_message(make_key(KeyCode::Down), false, false),
             Some(Message::SettingsNavigate { delta: 1 })
         );
 
         // Enter starts edit
         assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Enter), false),
+            key_to_settings_message(make_key(KeyCode::Enter), false, false),
             Some(Message::SettingsEdit)
         );
 
         // d deletes
         assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Char('d')), false),
+            key_to_settings_message(make_key(KeyCode::Char('d')), false, false),
             Some(Message::SettingsDelete)
         );
 
         // Esc closes
         assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Esc), false),
+            key_to_settings_message(make_key(KeyCode::Esc), false, false),
             Some(Message::CloseSettings)
         );
     }
@@ -395,35 +409,91 @@ mod tests {
     fn settings_edit_mode() {
         // Character input
         assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Char('a')), true),
+            key_to_settings_message(make_key(KeyCode::Char('a')), true, false),
             Some(Message::SettingsInput { ch: 'a' })
         );
 
         // Backspace
         assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Backspace), true),
+            key_to_settings_message(make_key(KeyCode::Backspace), true, false),
             Some(Message::SettingsBackspace)
         );
 
         // Enter confirms
         assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Enter), true),
+            key_to_settings_message(make_key(KeyCode::Enter), true, false),
             Some(Message::SettingsConfirm)
         );
 
         // Esc cancels
         assert_eq!(
-            key_to_settings_message(make_key(KeyCode::Esc), true),
+            key_to_settings_message(make_key(KeyCode::Esc), true, false),
             Some(Message::SettingsCancel)
+        );
+
+        // Left arrow moves cursor left in edit mode
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Left), true, false),
+            Some(Message::SettingsCursorLeft)
+        );
+
+        // Right arrow moves cursor right in edit mode
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Right), true, false),
+            Some(Message::SettingsCursorRight)
+        );
+    }
+
+    #[test]
+    fn settings_delete_pending_mode() {
+        // y confirms delete
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Char('y')), false, true),
+            Some(Message::SettingsInput { ch: 'y' })
+        );
+
+        // Y also confirms delete
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Char('Y')), false, true),
+            Some(Message::SettingsInput { ch: 'Y' })
+        );
+
+        // n cancels delete
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Char('n')), false, true),
+            Some(Message::SettingsInput { ch: 'n' })
+        );
+
+        // N also cancels delete
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Char('N')), false, true),
+            Some(Message::SettingsInput { ch: 'N' })
+        );
+
+        // Esc cancels delete
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Esc), false, true),
+            Some(Message::SettingsCancel)
+        );
+
+        // Other keys are ignored in delete pending mode
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Char('x')), false, true),
+            None
+        );
+        assert_eq!(
+            key_to_settings_message(make_key(KeyCode::Enter), false, true),
+            None
         );
     }
 
     #[test]
     fn settings_ctrl_c_always_quits() {
-        // Ctrl+C works in both modes
+        // Ctrl+C works in all modes
         assert_eq!(
             key_to_settings_message(
                 make_key_with_modifiers(KeyCode::Char('c'), KeyModifiers::CONTROL),
+                false,
                 false
             ),
             Some(Message::Quit)
@@ -431,6 +501,15 @@ mod tests {
         assert_eq!(
             key_to_settings_message(
                 make_key_with_modifiers(KeyCode::Char('c'), KeyModifiers::CONTROL),
+                true,
+                false
+            ),
+            Some(Message::Quit)
+        );
+        assert_eq!(
+            key_to_settings_message(
+                make_key_with_modifiers(KeyCode::Char('c'), KeyModifiers::CONTROL),
+                false,
                 true
             ),
             Some(Message::Quit)

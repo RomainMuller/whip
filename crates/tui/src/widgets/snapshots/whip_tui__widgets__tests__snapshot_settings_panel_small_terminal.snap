@@ -17,6 +17,6 @@ expression: buffer_to_string(&buf)
 │                                                │
 │                                                │
 │                                                │
-│←→: sections | ↑↓: navigate | Enter: edit | d: d│
+│←→: sections | ↑↓: navigate | Enter: edit |     │
 │                                                │
 ╰────────────────────────────────────────────────╯
