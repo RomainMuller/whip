@@ -7,6 +7,8 @@ license.workspace = true
 description = "GitHub API client for whip - handles issue fetching, caching, and token management"
 
 [dependencies]
+chrono = { workspace = true }
+dirs = { workspace = true }
 octocrab = "0.49"
 secrecy = "0.10"
 serde = { workspace = true }
@@ -14,6 +16,8 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = "0.1"
+uuid = { workspace = true }
+whip-protocol = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
