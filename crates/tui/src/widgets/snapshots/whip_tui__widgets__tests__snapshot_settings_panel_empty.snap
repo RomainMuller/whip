@@ -3,25 +3,25 @@ source: crates/tui/src/widgets/tests.rs
 expression: buffer_to_string(&buf)
 ---
 
-          ╭ Settings ────────────────────────────────────────────────╮
-          │          Repositories | Polling | Authentication         │
-          │                                                          │
-          │> + Add repository...                                     │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │                                                          │
-          │←→: sections | ↑↓: navigate | Enter: edit | d: delete | Es│
-          │                                                          │
-          ╰──────────────────────────────────────────────────────────╯
+    ╭ Settings ────────────────────────────────────────────────────────────╮
+    │                Repositories | Polling | Authentication               │
+    │                                                                      │
+    │> + Add repository...                                                 │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │                                                                      │
+    │  ←→: sections | ↑↓: navigate | Enter: edit | d: delete | Esc: close  │
+    │                                                                      │
+    ╰──────────────────────────────────────────────────────────────────────╯

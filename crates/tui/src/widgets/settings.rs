@@ -14,7 +14,7 @@ use ratatui::{
 use crate::settings_state::{EditMode, SettingsSection, SettingsState};
 
 /// The width of the settings panel.
-const SETTINGS_WIDTH: u16 = 60;
+const SETTINGS_WIDTH: u16 = 72;
 
 /// The height of the settings panel.
 const SETTINGS_HEIGHT: u16 = 22;
