@@ -500,6 +500,14 @@ mod tests {
     use super::*;
     use whip_config::{Config, Repository};
 
+    /// Extracts all characters from a buffer as a single string for content assertions.
+    fn buffer_content(buf: &Buffer) -> String {
+        buf.content()
+            .iter()
+            .map(|c| c.symbol().chars().next().unwrap_or(' '))
+            .collect()
+    }
+
     #[test]
     fn render_settings_panel_creates_output() {
         let config = Config::default();
@@ -509,12 +517,7 @@ mod tests {
 
         render_settings_panel(&state, area, &mut buf);
 
-        // Verify the settings title is rendered
-        let content: String = buf
-            .content()
-            .iter()
-            .map(|c| c.symbol().chars().next().unwrap_or(' '))
-            .collect();
+        let content = buffer_content(&buf);
         assert!(content.contains("Settings"));
         assert!(content.contains("Repositories"));
     }
@@ -546,11 +549,7 @@ mod tests {
 
         render_settings_panel(&state, area, &mut buf);
 
-        let content: String = buf
-            .content()
-            .iter()
-            .map(|c| c.symbol().chars().next().unwrap_or(' '))
-            .collect();
+        let content = buffer_content(&buf);
         assert!(content.contains("rust-lang/rust"));
         assert!(content.contains("tokio-rs/tokio"));
     }
@@ -573,5 +572,301 @@ mod tests {
 
         assert_eq!(centered.width, 30);
         assert_eq!(centered.height, 10);
+    }
+
+    // Tests for format_with_cursor
+
+    #[test]
+    fn format_with_cursor_empty_string() {
+        // Empty string with cursor at position 0 should show just the cursor
+        let result = format_with_cursor("", 0);
+        assert_eq!(result, "_");
+    }
+
+    #[test]
+    fn format_with_cursor_at_start() {
+        // Cursor at start should show cursor before text
+        let result = format_with_cursor("hello", 0);
+        assert_eq!(result, "_hello");
+    }
+
+    #[test]
+    fn format_with_cursor_at_end() {
+        // Cursor at end should show cursor after text
+        let result = format_with_cursor("hello", 5);
+        assert_eq!(result, "hello_");
+    }
+
+    #[test]
+    fn format_with_cursor_in_middle() {
+        // Cursor in middle should split text appropriately
+        let result = format_with_cursor("hello", 2);
+        assert_eq!(result, "he_llo");
+    }
+
+    #[test]
+    fn format_with_cursor_beyond_length() {
+        // Cursor beyond string length should clamp to end
+        let result = format_with_cursor("hello", 100);
+        assert_eq!(result, "hello_");
+    }
+
+    #[test]
+    fn format_with_cursor_with_utf8() {
+        // UTF-8 multi-byte characters should be handled correctly
+        let result = format_with_cursor("cafe", 2);
+        assert_eq!(result, "ca_fe");
+
+        // Cursor at end of UTF-8 string
+        let result = format_with_cursor("cafe", 4);
+        assert_eq!(result, "cafe_");
+    }
+
+    // Tests for render_polling_section
+
+    #[test]
+    fn render_polling_section_shows_interval_and_auto_adjust() {
+        let mut config = Config::default();
+        config.polling.interval_secs = 45;
+        config.polling.auto_adjust = true;
+
+        let state = SettingsState::new(config);
+        let area = Rect::new(0, 0, 60, 10);
+        let mut buf = Buffer::empty(area);
+
+        render_polling_section(&state, area, &mut buf);
+
+        let content = buffer_content(&buf);
+
+        // Verify polling interval is displayed
+        assert!(content.contains("Polling interval"));
+        assert!(content.contains("45"));
+        assert!(content.contains("seconds"));
+
+        // Verify auto-adjust toggle is displayed with checkbox
+        assert!(content.contains("Auto-adjust"));
+        assert!(content.contains("[x]")); // Checked since auto_adjust is true
+    }
+
+    #[test]
+    fn render_polling_section_shows_unchecked_when_auto_adjust_disabled() {
+        let mut config = Config::default();
+        config.polling.auto_adjust = false;
+
+        let mut state = SettingsState::new(config);
+        // Navigate to Polling section
+        state.next_section();
+
+        let area = Rect::new(0, 0, 60, 10);
+        let mut buf = Buffer::empty(area);
+
+        render_polling_section(&state, area, &mut buf);
+
+        let content = buffer_content(&buf);
+
+        // Verify unchecked checkbox
+        assert!(content.contains("[ ]"));
+    }
+
+    #[test]
+    fn render_polling_section_highlights_selected_item() {
+        let config = Config::default();
+        let mut state = SettingsState::new(config);
+        state.next_section(); // Go to Polling
+        state.navigate(1); // Select auto-adjust (index 1)
+
+        let area = Rect::new(0, 0, 60, 10);
+        let mut buf = Buffer::empty(area);
+
+        render_polling_section(&state, area, &mut buf);
+
+        let content = buffer_content(&buf);
+
+        // The auto-adjust line should have a selection indicator
+        // The content should contain both polling interval and auto-adjust
+        assert!(content.contains("Polling interval"));
+        assert!(content.contains("Auto-adjust"));
+    }
+
+    // Tests for render_authentication_section
+
+    #[test]
+    fn render_authentication_section_shows_token_not_set() {
+        let config = Config::default(); // No token set
+        let mut state = SettingsState::new(config);
+        state.next_section(); // Polling
+        state.next_section(); // Authentication
+
+        let area = Rect::new(0, 0, 60, 10);
+        let mut buf = Buffer::empty(area);
+
+        render_authentication_section(&state, area, &mut buf);
+
+        let content = buffer_content(&buf);
+
+        assert!(content.contains("GitHub Token"));
+        assert!(content.contains("(not set)"));
+    }
+
+    #[test]
+    fn render_authentication_section_shows_token_set() {
+        let config = Config {
+            github_token: Some("ghp_testtoken123456".to_string()),
+            ..Default::default()
+        };
+
+        let mut state = SettingsState::new(config);
+        state.next_section(); // Polling
+        state.next_section(); // Authentication
+
+        let area = Rect::new(0, 0, 60, 10);
+        let mut buf = Buffer::empty(area);
+
+        render_authentication_section(&state, area, &mut buf);
+
+        let content = buffer_content(&buf);
+
+        assert!(content.contains("GitHub Token"));
+        // Should show partial token and "(set)" indicator
+        assert!(content.contains("ghp_"));
+        assert!(content.contains("(set)"));
+    }
+
+    #[test]
+    fn render_authentication_section_shows_fallback_note() {
+        let config = Config::default();
+        let mut state = SettingsState::new(config);
+        state.next_section(); // Polling
+        state.next_section(); // Authentication
+
+        let area = Rect::new(0, 0, 60, 10);
+        let mut buf = Buffer::empty(area);
+
+        render_authentication_section(&state, area, &mut buf);
+
+        let content = buffer_content(&buf);
+
+        // Should show the gh CLI fallback note
+        assert!(content.contains("gh auth token"));
+    }
+
+    // Tests for render_repo_edit_mode
+
+    #[test]
+    fn render_repo_edit_mode_shows_path_and_token_fields() {
+        let area = Rect::new(0, 0, 60, 15);
+        let mut buf = Buffer::empty(area);
+
+        render_repo_edit_mode(
+            0,
+            "owner/repo",
+            5,
+            "secret-token",
+            6,
+            RepoEditField::Path,
+            area,
+            &mut buf,
+        );
+
+        let content = buffer_content(&buf);
+
+        // Verify path field label and content
+        assert!(content.contains("owner/repo"));
+
+        // Verify token field label (token is masked when not active)
+        assert!(content.contains("token (optional)"));
+
+        // Verify help text
+        assert!(content.contains("Tab"));
+        assert!(content.contains("Enter"));
+        assert!(content.contains("Esc"));
+    }
+
+    #[test]
+    fn render_repo_edit_mode_shows_cursor_in_active_field() {
+        let area = Rect::new(0, 0, 60, 15);
+        let mut buf = Buffer::empty(area);
+
+        render_repo_edit_mode(
+            0,
+            "test",
+            2, // Cursor in middle of path
+            "",
+            0,
+            RepoEditField::Path,
+            area,
+            &mut buf,
+        );
+
+        let content = buffer_content(&buf);
+
+        // Active path field should show cursor
+        assert!(content.contains("te_st"));
+    }
+
+    #[test]
+    fn render_repo_edit_mode_masks_inactive_token() {
+        let area = Rect::new(0, 0, 60, 15);
+        let mut buf = Buffer::empty(area);
+
+        render_repo_edit_mode(
+            0,
+            "owner/repo",
+            10,
+            "secrettoken",
+            11,
+            RepoEditField::Path, // Path is active, token is inactive
+            area,
+            &mut buf,
+        );
+
+        let content = buffer_content(&buf);
+
+        // Token should be masked with asterisks when inactive
+        assert!(content.contains("***"));
+    }
+
+    #[test]
+    fn render_repo_edit_mode_shows_optional_placeholder_for_empty_token() {
+        let area = Rect::new(0, 0, 60, 15);
+        let mut buf = Buffer::empty(area);
+
+        render_repo_edit_mode(
+            0,
+            "owner/repo",
+            10,
+            "", // Empty token
+            0,
+            RepoEditField::Path, // Path is active
+            area,
+            &mut buf,
+        );
+
+        let content = buffer_content(&buf);
+
+        // Empty token should show "(optional)" placeholder
+        assert!(content.contains("(optional)"));
+    }
+
+    #[test]
+    fn render_repo_edit_mode_token_field_active_shows_cursor() {
+        let area = Rect::new(0, 0, 60, 15);
+        let mut buf = Buffer::empty(area);
+
+        render_repo_edit_mode(
+            0,
+            "owner/repo",
+            10,
+            "abc",
+            1,
+            RepoEditField::Token, // Token is active
+            area,
+            &mut buf,
+        );
+
+        let content = buffer_content(&buf);
+
+        // Token field is active, should show cursor in the token value
+        assert!(content.contains("a_bc"));
     }
 }

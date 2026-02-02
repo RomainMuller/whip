@@ -257,4 +257,168 @@ mod tests {
         let id4 = Uuid::new_v5(&GITHUB_ISSUE_NAMESPACE, b"rust-lang/cargo#12345");
         assert_ne!(id1, id4);
     }
+
+    /// Creates a minimal valid JSON for an octocrab Issue.
+    ///
+    /// The octocrab Issue struct has many required fields. This helper provides
+    /// a template with all required fields populated, allowing tests to focus on
+    /// the fields that matter for the test case.
+    fn mock_issue_json(
+        number: u64,
+        title: &str,
+        body: Option<&str>,
+        user_login: &str,
+        labels: &[&str],
+        comment_count: u32,
+    ) -> String {
+        let body_json = match body {
+            Some(b) => format!(r#""{b}""#),
+            None => "null".to_string(),
+        };
+
+        let labels_json: Vec<String> = labels
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                format!(
+                    r#"{{ "id": {}, "node_id": "L{}", "url": "https://api.github.com/labels/{}", "name": "{}", "color": "d73a4a", "default": false }}"#,
+                    i + 1, i + 1, name, name
+                )
+            })
+            .collect();
+
+        format!(
+            r#"{{
+            "id": 1,
+            "node_id": "I_test123",
+            "url": "https://api.github.com/repos/testowner/testrepo/issues/{number}",
+            "repository_url": "https://api.github.com/repos/testowner/testrepo",
+            "labels_url": "https://api.github.com/repos/testowner/testrepo/issues/{number}/labels",
+            "comments_url": "https://api.github.com/repos/testowner/testrepo/issues/{number}/comments",
+            "events_url": "https://api.github.com/repos/testowner/testrepo/issues/{number}/events",
+            "html_url": "https://github.com/testowner/testrepo/issues/{number}",
+            "number": {number},
+            "state": "open",
+            "title": "{title}",
+            "body": {body_json},
+            "user": {{
+                "login": "{user_login}",
+                "id": 123,
+                "node_id": "U_test123",
+                "avatar_url": "https://avatars.githubusercontent.com/u/123",
+                "gravatar_id": "",
+                "url": "https://api.github.com/users/{user_login}",
+                "html_url": "https://github.com/{user_login}",
+                "followers_url": "https://api.github.com/users/{user_login}/followers",
+                "following_url": "https://api.github.com/users/{user_login}/following{{/other_user}}",
+                "gists_url": "https://api.github.com/users/{user_login}/gists{{/gist_id}}",
+                "starred_url": "https://api.github.com/users/{user_login}/starred{{/owner}}{{/repo}}",
+                "subscriptions_url": "https://api.github.com/users/{user_login}/subscriptions",
+                "organizations_url": "https://api.github.com/users/{user_login}/orgs",
+                "repos_url": "https://api.github.com/users/{user_login}/repos",
+                "events_url": "https://api.github.com/users/{user_login}/events{{/privacy}}",
+                "received_events_url": "https://api.github.com/users/{user_login}/received_events",
+                "type": "User",
+                "site_admin": false
+            }},
+            "labels": [{}],
+            "assignees": [],
+            "locked": false,
+            "comments": {comment_count},
+            "created_at": "2024-01-15T10:30:00Z",
+            "updated_at": "2024-01-20T14:45:00Z"
+        }}"#,
+            labels_json.join(", ")
+        )
+    }
+
+    #[test]
+    fn issue_to_task_converts_all_fields() {
+        let issue_json = mock_issue_json(
+            42,
+            "Test Issue Title",
+            Some("This is the issue description"),
+            "testuser",
+            &["bug", "enhancement"],
+            5,
+        );
+
+        let issue: octocrab::models::issues::Issue =
+            serde_json::from_str(&issue_json).expect("Failed to deserialize mock issue");
+
+        let task = issue_to_task(&issue, "testowner", "testrepo");
+
+        // Verify basic task fields
+        assert_eq!(task.title, "Test Issue Title");
+        assert_eq!(task.description, "This is the issue description");
+        assert_eq!(task.state, TaskState::Idle);
+        assert_eq!(task.lane, LaneKind::Backlog);
+
+        // Verify GitHub source metadata
+        let github = task.github.expect("Task should have GitHub source");
+        assert_eq!(github.owner, "testowner");
+        assert_eq!(github.repo, "testrepo");
+        assert_eq!(github.number, 42);
+        assert_eq!(
+            github.url,
+            "https://github.com/testowner/testrepo/issues/42"
+        );
+        assert_eq!(github.labels, vec!["bug", "enhancement"]);
+        assert_eq!(github.author, "testuser");
+        assert_eq!(github.comment_count, 5);
+
+        // Verify deterministic ID generation
+        let expected_id = Uuid::new_v5(&GITHUB_ISSUE_NAMESPACE, b"testowner/testrepo#42");
+        assert_eq!(task.id, expected_id);
+
+        // Verify timestamps are preserved
+        assert_eq!(task.created_at.to_rfc3339(), "2024-01-15T10:30:00+00:00");
+        assert_eq!(task.updated_at.to_rfc3339(), "2024-01-20T14:45:00+00:00");
+    }
+
+    #[test]
+    fn issue_to_task_handles_missing_body() {
+        let issue_json = mock_issue_json(99, "Issue without body", None, "anotheruser", &[], 0);
+
+        let issue: octocrab::models::issues::Issue =
+            serde_json::from_str(&issue_json).expect("Failed to deserialize mock issue");
+
+        let task = issue_to_task(&issue, "owner", "repo");
+
+        // Body should default to empty string when null
+        assert_eq!(task.description, "");
+        assert_eq!(task.title, "Issue without body");
+
+        // GitHub metadata should still be populated
+        let github = task.github.expect("Task should have GitHub source");
+        assert!(github.labels.is_empty());
+        assert_eq!(github.author, "anotheruser");
+        assert_eq!(github.comment_count, 0);
+    }
+
+    #[test]
+    fn issue_to_task_same_issue_same_id() {
+        let issue_json = mock_issue_json(123, "Reproducible ID", Some("Test body"), "user", &[], 0);
+
+        let issue: octocrab::models::issues::Issue =
+            serde_json::from_str(&issue_json).expect("Failed to deserialize mock issue");
+
+        let task1 = issue_to_task(&issue, "myorg", "myrepo");
+        let task2 = issue_to_task(&issue, "myorg", "myrepo");
+
+        assert_eq!(task1.id, task2.id);
+    }
+
+    #[test]
+    fn issue_to_task_different_repos_different_ids() {
+        let issue_json = mock_issue_json(1, "Same number", None, "user", &[], 0);
+
+        let issue: octocrab::models::issues::Issue =
+            serde_json::from_str(&issue_json).expect("Failed to deserialize mock issue");
+
+        let task_a = issue_to_task(&issue, "org-a", "repo");
+        let task_b = issue_to_task(&issue, "org-b", "repo");
+
+        assert_ne!(task_a.id, task_b.id);
+    }
 }
