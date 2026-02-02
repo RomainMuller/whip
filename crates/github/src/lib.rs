@@ -108,8 +108,10 @@ pub mod cache;
 pub mod client;
 pub mod error;
 pub mod issue;
+pub mod label;
 
 pub use cache::{CachedIssues, IssueCache};
 pub use client::GitHubClient;
 pub use error::{Error, Result};
 pub use issue::{FetchOptions, IssueState, issue_to_task};
+pub use label::{GitHubLabel, SyncResult, sync_labels};

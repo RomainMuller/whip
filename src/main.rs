@@ -7,7 +7,9 @@ use std::time::Duration;
 use secrecy::SecretString;
 use whip_config::Config;
 use whip_config::auth::resolve_token;
-use whip_github::{CachedIssues, FetchOptions, GitHubClient, IssueCache, issue_to_task};
+use whip_github::{
+    CachedIssues, FetchOptions, GitHubClient, IssueCache, issue_to_task, sync_labels,
+};
 use whip_protocol::KanbanBoard;
 use whip_tui::{App, RunResult, terminal};
 
@@ -21,7 +23,18 @@ async fn main() -> anyhow::Result<()> {
 
     // Load board from GitHub BEFORE terminal setup so errors are visible
     let board = if config.has_repositories() {
-        load_github_board(&config).await.unwrap_or_else(|e| {
+        // Run label sync and board loading concurrently
+        let (sync_result, board_result) = tokio::join!(
+            sync_labels_for_repositories(&config),
+            load_github_board(&config)
+        );
+
+        // Report any sync errors but continue
+        if let Err(e) = sync_result {
+            eprintln!("Warning: failed to sync labels: {e}");
+        }
+
+        board_result.unwrap_or_else(|e| {
             eprintln!("Warning: failed to load GitHub issues: {e}");
             KanbanBoard::new()
         })
@@ -83,12 +96,61 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Syncs whip labels to all configured repositories.
+///
+/// This ensures that all repositories have the standard `whip/*` labels
+/// with consistent colors and descriptions. Skipped if `sync_labels` is
+/// disabled in the configuration.
+async fn sync_labels_for_repositories(config: &Config) -> anyhow::Result<()> {
+    if !config.sync_labels {
+        return Ok(());
+    }
+
+    for repo in &config.repositories {
+        let owner = repo.owner();
+        let repo_name = repo.repo();
+
+        // Need a token to sync labels (write access required)
+        let token = resolve_token(repo, config.github_token.as_deref()).await;
+        if token.is_none() {
+            eprintln!(
+                "Skipping label sync for {owner}/{repo_name}: no authentication token available"
+            );
+            continue;
+        }
+        let token = token.map(SecretString::from);
+
+        match GitHubClient::new(token).await {
+            Ok(client) => match sync_labels(&client, owner, repo_name).await {
+                Ok(result) => {
+                    if result.created > 0 || result.updated > 0 {
+                        eprintln!(
+                            "Synced labels for {owner}/{repo_name}: {} created, {} updated",
+                            result.created, result.updated
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Warning: failed to sync labels for {owner}/{repo_name}: {e}");
+                }
+            },
+            Err(e) => {
+                eprintln!("Warning: failed to create client for label sync: {e}");
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Loads a KanbanBoard from GitHub issues.
 ///
 /// Uses caching with the following strategy:
 /// 1. Load from cache immediately (fast startup)
 /// 2. If cache is stale or missing, fetch from GitHub
 /// 3. Save to cache for next startup
+///
+/// Only includes issues that have a `whip/*` status label.
 async fn load_github_board(config: &Config) -> anyhow::Result<KanbanBoard> {
     let cache = IssueCache::new()?;
     let mut board = KanbanBoard::new();
@@ -125,9 +187,10 @@ async fn load_github_board(config: &Config) -> anyhow::Result<KanbanBoard> {
                 let options = FetchOptions::default();
                 match client.fetch_issues(owner, repo_name, &options).await {
                     Ok(issues) => {
+                        // Only include issues with whip/* labels
                         let tasks: Vec<_> = issues
                             .iter()
-                            .map(|issue| issue_to_task(issue, owner, repo_name))
+                            .filter_map(|issue| issue_to_task(issue, owner, repo_name))
                             .collect();
 
                         let count = tasks.len();
@@ -145,7 +208,7 @@ async fn load_github_board(config: &Config) -> anyhow::Result<KanbanBoard> {
                         } else {
                             " (unauthenticated)"
                         };
-                        eprintln!("{count} issues{auth_note}");
+                        eprintln!("{count} whip-labeled issues{auth_note}");
                     }
                     Err(e) => {
                         eprintln!("failed: {e}");
@@ -189,9 +252,10 @@ async fn refresh_github_board(config: &Config) -> anyhow::Result<KanbanBoard> {
                 let options = FetchOptions::default();
                 match client.fetch_issues(owner, repo_name, &options).await {
                     Ok(issues) => {
+                        // Only include issues with whip/* labels
                         let tasks: Vec<_> = issues
                             .iter()
-                            .map(|issue| issue_to_task(issue, owner, repo_name))
+                            .filter_map(|issue| issue_to_task(issue, owner, repo_name))
                             .collect();
 
                         // Update cache

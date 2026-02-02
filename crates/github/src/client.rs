@@ -271,8 +271,13 @@ impl GitHubClient {
                 .map_err(Error::Api)?
         };
 
-        let issues: Vec<_> = page.items;
-        debug!(count = issues.len(), "fetched issues");
+        // Filter out pull requests (GitHub API returns PRs in the issues endpoint)
+        let issues: Vec<_> = page
+            .items
+            .into_iter()
+            .filter(|issue| issue.pull_request.is_none())
+            .collect();
+        debug!(count = issues.len(), "fetched issues (excluding PRs)");
 
         Ok(issues)
     }

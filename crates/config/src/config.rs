@@ -29,9 +29,10 @@ use crate::repository::Repository;
 ///     repositories: vec![Repository::new("rust-lang", "rust")],
 ///     polling: PollingConfig::with_interval(120),
 ///     github_token: Some("ghp_xxx".to_string()),
+///     sync_labels: true,
 /// };
 /// ```
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Config {
     /// List of GitHub repositories to monitor.
     ///
@@ -52,6 +53,32 @@ pub struct Config {
     /// If not set, the application will try to get a token from the `gh` CLI.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub github_token: Option<String>,
+
+    /// Whether to sync whip labels to GitHub repositories on startup.
+    ///
+    /// When enabled, whip will create or update the standard `whip/*` labels
+    /// in all configured repositories. This ensures consistent label naming
+    /// and colors across repositories.
+    ///
+    /// Defaults to `true`.
+    #[serde(default = "default_sync_labels")]
+    pub sync_labels: bool,
+}
+
+/// Default value for `sync_labels` configuration option.
+fn default_sync_labels() -> bool {
+    true
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            repositories: Vec::new(),
+            polling: PollingConfig::default(),
+            github_token: None,
+            sync_labels: default_sync_labels(),
+        }
+    }
 }
 
 impl Config {
@@ -266,6 +293,7 @@ mod tests {
         let config = Config::default();
         assert!(config.repositories.is_empty());
         assert!(config.github_token.is_none());
+        assert!(config.sync_labels); // defaults to true
         assert!(config.validate().is_ok());
     }
 
@@ -316,6 +344,7 @@ mod tests {
             repositories: vec![Repository::new("owner", "repo")],
             polling: PollingConfig::with_interval(60),
             github_token: Some("ghp_xxx".to_string()),
+            sync_labels: true,
         };
         assert!(config.validate().is_ok());
     }
@@ -338,6 +367,7 @@ mod tests {
             ],
             polling: PollingConfig::with_interval(120),
             github_token: Some("ghp_global".to_string()),
+            sync_labels: true,
         };
 
         let json = serde_json::to_string(&config).unwrap();
@@ -351,6 +381,7 @@ mod tests {
         let config: Config = serde_json::from_str(json).unwrap();
         assert!(config.repositories.is_empty());
         assert!(config.github_token.is_none());
+        assert!(config.sync_labels); // defaults to true from serde default
     }
 
     #[test]
@@ -397,6 +428,7 @@ mod tests {
             repositories: vec![Repository::new("owner", "repo")],
             polling: PollingConfig::with_interval(120),
             github_token: Some("ghp_xxx".to_string()),
+            sync_labels: false, // test non-default value
         };
 
         original.save_to(&path).unwrap();
@@ -413,5 +445,23 @@ mod tests {
         };
         let json = serde_json::to_string(&config).unwrap();
         assert!(!json.contains("github_token"));
+    }
+
+    #[test]
+    fn sync_labels_defaults_to_true() {
+        let config = Config::default();
+        assert!(config.sync_labels);
+
+        // Also verify serde default works
+        let json = r#"{"repositories": []}"#;
+        let parsed: Config = serde_json::from_str(json).unwrap();
+        assert!(parsed.sync_labels);
+    }
+
+    #[test]
+    fn sync_labels_can_be_disabled() {
+        let json = r#"{"sync_labels": false}"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert!(!config.sync_labels);
     }
 }
