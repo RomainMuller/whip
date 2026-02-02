@@ -26,15 +26,16 @@
 //! let issues = client.fetch_issues("rust-lang", "rust", &options).await?;
 //!
 //! for issue in &issues {
-//!     let task = issue_to_task(issue, "rust-lang", "rust");
-//!     println!("Task: {} - {}", task.id, task.title);
+//!     if let Some(task) = issue_to_task(issue, "rust-lang", "rust") {
+//!         println!("Task: {} - {}", task.id, task.title);
+//!     }
 //! }
 //! # Ok(())
 //! # }
 //! ```
 
 use uuid::Uuid;
-use whip_protocol::{GitHubSource, LaneKind, Task, TaskId, TaskState};
+use whip_protocol::{GitHubSource, Task, TaskId, determine_status_from_labels};
 
 /// UUID namespace for generating deterministic task IDs from GitHub issues.
 ///
@@ -106,11 +107,14 @@ impl IssueState {
     }
 }
 
-/// Converts a GitHub issue to a whip [`Task`].
+/// Converts a GitHub issue to a whip [`Task`], if it has a whip status label.
 ///
 /// This function creates a task with a deterministic ID based on the repository
 /// and issue number, ensuring that the same issue always maps to the same task ID
 /// across sessions.
+///
+/// Returns `None` if the issue does not have any `whip/*` status label, as such
+/// issues are not managed by whip.
 ///
 /// # ID Generation
 ///
@@ -121,39 +125,48 @@ impl IssueState {
 /// - Different issues produce different task IDs (with astronomically high probability)
 /// - IDs are stable across application restarts
 ///
-/// # Field Mapping
+/// # Lane Assignment
 ///
-/// | GitHub Issue Field | Task Field |
-/// |--------------------|------------|
-/// | `title` | `title` |
-/// | `body` | `description` (empty string if None) |
-/// | `created_at` | `created_at` |
-/// | `updated_at` | `updated_at` |
-/// | - | `state` = `TaskState::Idle` |
-/// | - | `lane` = `LaneKind::Backlog` |
+/// The task's lane is determined by the presence of `whip/*` labels:
+///
+/// | Label | Lane |
+/// |-------|------|
+/// | `whip/backlog` | Backlog |
+/// | `whip/in-progress` | In Progress |
+/// | `whip/under-review` | Under Review |
+/// | `whip/done` | Done |
+///
+/// If multiple whip labels are present, the first one in lane order takes precedence.
 ///
 /// # Example
 ///
 /// ```no_run
 /// use whip_github::issue_to_task;
 ///
-/// // Assuming `issue` is an octocrab issue
+/// // Assuming `issue` is an octocrab issue with a whip/backlog label
 /// # fn example(issue: &octocrab::models::issues::Issue) {
-/// let task = issue_to_task(issue, "owner", "repo");
-/// assert_eq!(task.lane, whip_protocol::LaneKind::Backlog);
-/// assert_eq!(task.state, whip_protocol::TaskState::Idle);
+/// if let Some(task) = issue_to_task(issue, "owner", "repo") {
+///     println!("Task: {} in lane {:?}", task.title, task.lane);
+/// }
 /// # }
 /// ```
 #[must_use]
-pub fn issue_to_task(issue: &octocrab::models::issues::Issue, owner: &str, repo: &str) -> Task {
+pub fn issue_to_task(
+    issue: &octocrab::models::issues::Issue,
+    owner: &str,
+    repo: &str,
+) -> Option<Task> {
     let number = issue.number;
+
+    // Extract label names from issue labels
+    let labels: Vec<String> = issue.labels.iter().map(|l| l.name.clone()).collect();
+
+    // Determine lane and state from whip/* labels - if no whip label, skip this issue
+    let status = determine_status_from_labels(&labels)?;
 
     // Generate deterministic task ID from owner/repo#number
     let id_input = format!("{owner}/{repo}#{number}");
     let id = Uuid::new_v5(&GITHUB_ISSUE_NAMESPACE, id_input.as_bytes());
-
-    // Extract label names from issue labels
-    let labels: Vec<String> = issue.labels.iter().map(|l| l.name.clone()).collect();
 
     // Extract author login
     let author = issue.user.login.clone();
@@ -173,21 +186,22 @@ pub fn issue_to_task(issue: &octocrab::models::issues::Issue, owner: &str, repo:
     let created_at = issue.created_at;
     let updated_at = issue.updated_at;
 
-    Task {
+    Some(Task {
         id: TaskId::from(id),
         title: issue.title.clone(),
         description: issue.body.clone().unwrap_or_default(),
-        state: TaskState::Idle,
-        lane: LaneKind::Backlog,
+        state: status.state,
+        lane: status.lane,
         created_at,
         updated_at,
         github: Some(github),
-    }
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use whip_protocol::{LaneKind, TaskState};
 
     #[test]
     fn fetch_options_default() {
@@ -334,25 +348,27 @@ mod tests {
 
     #[test]
     fn issue_to_task_converts_all_fields() {
+        // Include whip/in-progress label to ensure the issue is picked up
         let issue_json = mock_issue_json(
             42,
             "Test Issue Title",
             Some("This is the issue description"),
             "testuser",
-            &["bug", "enhancement"],
+            &["bug", "whip/in-progress", "enhancement"],
             5,
         );
 
         let issue: octocrab::models::issues::Issue =
             serde_json::from_str(&issue_json).expect("Failed to deserialize mock issue");
 
-        let task = issue_to_task(&issue, "testowner", "testrepo");
+        let task = issue_to_task(&issue, "testowner", "testrepo")
+            .expect("Issue with whip label should produce a task");
 
         // Verify basic task fields
         assert_eq!(task.title, "Test Issue Title");
         assert_eq!(task.description, "This is the issue description");
-        assert_eq!(task.state, TaskState::Idle);
-        assert_eq!(task.lane, LaneKind::Backlog);
+        assert_eq!(task.state, TaskState::InFlight); // whip/in-progress -> InFlight
+        assert_eq!(task.lane, LaneKind::InProgress);
 
         // Verify GitHub source metadata
         let github = task.github.expect("Task should have GitHub source");
@@ -363,7 +379,10 @@ mod tests {
             github.url,
             "https://github.com/testowner/testrepo/issues/42"
         );
-        assert_eq!(github.labels, vec!["bug", "enhancement"]);
+        assert_eq!(
+            github.labels,
+            vec!["bug", "whip/in-progress", "enhancement"]
+        );
         assert_eq!(github.author, "testuser");
         assert_eq!(github.comment_count, 5);
 
@@ -377,48 +396,120 @@ mod tests {
     }
 
     #[test]
-    fn issue_to_task_handles_missing_body() {
-        let issue_json = mock_issue_json(99, "Issue without body", None, "anotheruser", &[], 0);
+    fn issue_to_task_returns_none_without_whip_label() {
+        let issue_json = mock_issue_json(
+            99,
+            "Issue without whip label",
+            None,
+            "anotheruser",
+            &["bug"],
+            0,
+        );
 
         let issue: octocrab::models::issues::Issue =
             serde_json::from_str(&issue_json).expect("Failed to deserialize mock issue");
 
         let task = issue_to_task(&issue, "owner", "repo");
 
+        // Should return None because there's no whip/* label
+        assert!(task.is_none());
+    }
+
+    #[test]
+    fn issue_to_task_handles_missing_body() {
+        let issue_json = mock_issue_json(
+            99,
+            "Issue without body",
+            None,
+            "anotheruser",
+            &["whip/backlog"],
+            0,
+        );
+
+        let issue: octocrab::models::issues::Issue =
+            serde_json::from_str(&issue_json).expect("Failed to deserialize mock issue");
+
+        let task = issue_to_task(&issue, "owner", "repo")
+            .expect("Issue with whip label should produce a task");
+
         // Body should default to empty string when null
         assert_eq!(task.description, "");
         assert_eq!(task.title, "Issue without body");
+        assert_eq!(task.lane, LaneKind::Backlog);
 
         // GitHub metadata should still be populated
         let github = task.github.expect("Task should have GitHub source");
-        assert!(github.labels.is_empty());
+        assert_eq!(github.labels, vec!["whip/backlog"]);
         assert_eq!(github.author, "anotheruser");
         assert_eq!(github.comment_count, 0);
     }
 
     #[test]
     fn issue_to_task_same_issue_same_id() {
-        let issue_json = mock_issue_json(123, "Reproducible ID", Some("Test body"), "user", &[], 0);
+        let issue_json = mock_issue_json(
+            123,
+            "Reproducible ID",
+            Some("Test body"),
+            "user",
+            &["whip/done"],
+            0,
+        );
 
         let issue: octocrab::models::issues::Issue =
             serde_json::from_str(&issue_json).expect("Failed to deserialize mock issue");
 
-        let task1 = issue_to_task(&issue, "myorg", "myrepo");
-        let task2 = issue_to_task(&issue, "myorg", "myrepo");
+        let task1 = issue_to_task(&issue, "myorg", "myrepo").unwrap();
+        let task2 = issue_to_task(&issue, "myorg", "myrepo").unwrap();
 
         assert_eq!(task1.id, task2.id);
     }
 
     #[test]
     fn issue_to_task_different_repos_different_ids() {
-        let issue_json = mock_issue_json(1, "Same number", None, "user", &[], 0);
+        let issue_json = mock_issue_json(1, "Same number", None, "user", &["whip/under-review"], 0);
 
         let issue: octocrab::models::issues::Issue =
             serde_json::from_str(&issue_json).expect("Failed to deserialize mock issue");
 
-        let task_a = issue_to_task(&issue, "org-a", "repo");
-        let task_b = issue_to_task(&issue, "org-b", "repo");
+        let task_a = issue_to_task(&issue, "org-a", "repo").unwrap();
+        let task_b = issue_to_task(&issue, "org-b", "repo").unwrap();
 
         assert_ne!(task_a.id, task_b.id);
+    }
+
+    #[test]
+    fn issue_to_task_assigns_correct_lane_from_label() {
+        // Test each label -> lane and state mapping
+        let test_cases = [
+            ("whip/backlog", LaneKind::Backlog, TaskState::Idle),
+            (
+                "whip/in-progress",
+                LaneKind::InProgress,
+                TaskState::InFlight,
+            ),
+            ("whip/under-review", LaneKind::UnderReview, TaskState::Idle),
+            ("whip/done", LaneKind::Done, TaskState::Success),
+            ("whip/failed", LaneKind::Done, TaskState::Failed),
+        ];
+
+        for (label, expected_lane, expected_state) in test_cases {
+            let issue_json = mock_issue_json(1, "Test", None, "user", &[label], 0);
+            let issue: octocrab::models::issues::Issue =
+                serde_json::from_str(&issue_json).expect("Failed to deserialize mock issue");
+
+            let task = issue_to_task(&issue, "owner", "repo")
+                .expect("Issue with whip label should produce a task");
+
+            assert_eq!(
+                task.lane, expected_lane,
+                "Label {} should map to lane {:?}",
+                label, expected_lane
+            );
+            assert_eq!(
+                task.state, expected_state,
+                "Label {} should map to state {:?}",
+                label, expected_state
+            );
+        }
     }
 }

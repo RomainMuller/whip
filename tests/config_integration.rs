@@ -50,6 +50,7 @@ async fn config_save_and_reload() {
         ],
         polling: PollingConfig::with_interval(90),
         github_token: Some("ghp_global".to_string()),
+        sync_labels: true,
     };
 
     original.save_to(&config_path).unwrap();
@@ -161,6 +162,7 @@ fn config_validation() {
         repositories: vec![Repository::new("owner", "repo")],
         polling: PollingConfig::with_interval(60),
         github_token: Some("ghp_xxx".to_string()),
+        sync_labels: true,
     };
     assert!(valid.validate().is_ok());
 

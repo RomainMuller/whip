@@ -39,11 +39,17 @@
 pub mod board;
 pub mod dummy;
 pub mod error;
+pub mod label;
 pub mod message;
 pub mod task;
 
 // Re-export primary types at crate root for convenience
 pub use board::{KanbanBoard, Lane, LaneKind};
 pub use error::{ProtocolError, Result};
+pub use label::{
+    LABEL_PREFIX, LabelDefinition, StatusFromLabel, determine_lane_from_labels,
+    determine_status_from_labels, has_whip_status_label, label_to_lane, label_to_status,
+    standard_status_labels,
+};
 pub use message::Message;
 pub use task::{GitHubSource, Task, TaskId, TaskState};
